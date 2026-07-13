@@ -113,7 +113,9 @@ async function saveImage(base64Str, idPrefix, folder) {
         throw new Error(result.error || 'Unknown cPanel upload error');
       }
     } catch (err) {
-      console.error('❌ Failed to upload base64 to cPanel, falling back to local storage:', err.message);
+      console.error('❌ Failed to upload base64 to cPanel:', err.message);
+      // Return null or original in production instead of writing to read-only disk
+      return null;
     }
   }
 
@@ -151,17 +153,20 @@ async function processBase64FieldsAsync(dataRow, idPrefix) {
   return row;
 }
 
-// Multer Disk Storage Configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
-});
+// Multer Storage Configuration (Memory in production, Disk in development)
+const isProduction = process.env.NODE_ENV === 'production';
+const storage = isProduction
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, uploadsDir);
+      },
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+      }
+    });
 
 const upload = multer({
   storage: storage,
@@ -176,18 +181,22 @@ app.post('/api/storage/upload', upload.single('file'), async (req, res) => {
     }
 
     const cpanelUploadUrl = process.env.CPANEL_UPLOAD_URL;
-    const isProduction = process.env.NODE_ENV === 'production';
 
     if (isProduction && cpanelUploadUrl) {
       try {
-        console.log(`📤 Uploading file ${req.file.filename} to cPanel...`);
-        const fileBuffer = fs.readFileSync(req.file.path);
+        // Generate a clean filename for cPanel
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(req.file.originalname);
+        const filename = req.file.fieldname + '-' + uniqueSuffix + ext;
+
+        console.log(`📤 Uploading file ${filename} to cPanel...`);
+        const fileBuffer = req.file.buffer;
         const blob = new Blob([fileBuffer], { type: req.file.mimetype });
         const formData = new FormData();
-        formData.append('file', blob, req.file.filename);
+        formData.append('file', blob, filename);
 
         let folder = 'uploads';
-        const filenameLower = req.file.filename.toLowerCase();
+        const filenameLower = filename.toLowerCase();
         if (filenameLower.includes('member')) folder = 'members';
         else if (filenameLower.includes('event')) folder = 'events';
         else if (filenameLower.includes('guest')) folder = 'guests';
@@ -205,11 +214,6 @@ app.post('/api/storage/upload', upload.single('file'), async (req, res) => {
         const result = await response.json();
         if (result.success && result.url) {
           console.log(`✅ File uploaded to cPanel successfully: ${result.url}`);
-          // Clean up the local temporary file
-          try {
-            fs.unlinkSync(req.file.path);
-          } catch (_) {}
-
           return res.status(200).json({
             path: result.path,
             publicUrl: result.url
@@ -218,7 +222,8 @@ app.post('/api/storage/upload', upload.single('file'), async (req, res) => {
           throw new Error(result.error || 'Unknown cPanel upload error');
         }
       } catch (err) {
-        console.error('❌ Failed to upload file to cPanel, falling back to local URL:', err.message);
+        console.error('❌ Failed to upload file to cPanel:', err.message);
+        return res.status(500).json({ error: 'cPanel upload failed: ' + err.message });
       }
     }
 
@@ -1017,6 +1022,10 @@ async function repairProfileImages() {
 
 app.listen(PORT, async () => {
   console.log(`ITLC Backend Server running on port ${PORT}`);
-  await repairProfileImages();
+  if (process.env.NODE_ENV !== 'production') {
+    await repairProfileImages();
+  } else {
+    console.log('🚀 Production mode: Skipping startup profile image repair scan.');
+  }
 });
 
