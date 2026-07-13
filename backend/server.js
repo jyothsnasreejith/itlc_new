@@ -86,7 +86,11 @@ async function saveImage(base64Str, idPrefix, folder) {
   const cpanelUploadUrl = process.env.CPANEL_UPLOAD_URL;
   const isProduction = process.env.NODE_ENV === 'production';
 
-  if (isProduction && cpanelUploadUrl) {
+  if (isProduction) {
+    if (!cpanelUploadUrl) {
+      console.error('❌ Error: CPANEL_UPLOAD_URL is not set in environment variables.');
+      return null;
+    }
     try {
       console.log(`📤 Uploading base64 image ${filename} to cPanel...`);
       const response = await fetch(cpanelUploadUrl, {
@@ -114,16 +118,15 @@ async function saveImage(base64Str, idPrefix, folder) {
       }
     } catch (err) {
       console.error('❌ Failed to upload base64 to cPanel:', err.message);
-      // Return null or original in production instead of writing to read-only disk
       return null;
     }
+  } else {
+    // Fallback to local storage (development mode only)
+    const destPath = path.join(uploadsDir, filename);
+    fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
+    const appUrl = process.env.APP_URL || `http://localhost:${PORT || 5000}`;
+    return `${appUrl}/uploads/${filename}`;
   }
-
-  // Fallback to local storage (development mode)
-  const destPath = path.join(uploadsDir, filename);
-  fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
-  const appUrl = process.env.APP_URL || `http://localhost:${PORT || 5000}`;
-  return `${appUrl}/uploads/${filename}`;
 }
 
 // Intercept base64 fields in queries and replace them with local static or remote URLs
