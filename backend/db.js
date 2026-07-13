@@ -15,7 +15,7 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'itlc_db',
   port: parseInt(process.env.DB_PORT || '3306'),
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 3, // Lowered from 10 to prevent exceeding cPanel max_user_connections limit
   queueLimit: 0
 });
 
