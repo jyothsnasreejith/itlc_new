@@ -62,27 +62,89 @@ function saveBase64ToFile(base64Str, idPrefix) {
   return filename;
 }
 
-// Intercept base64 fields in queries and replace them with local static URLs
-function processBase64Fields(dataRow, idPrefix, appUrl) {
+// Asynchronous helper to save image (local in development, cPanel in production)
+async function saveImage(base64Str, idPrefix, folder) {
+  if (!base64Str) return null;
+  const cleanStr = base64Str.trim();
+  if (!cleanStr.startsWith('data:image/')) return null;
+
+  const semiColonIndex = cleanStr.indexOf(';base64,');
+  if (semiColonIndex === -1) return null;
+
+  const mimeType = cleanStr.substring(5, semiColonIndex);
+  const base64Data = cleanStr.substring(semiColonIndex + 8).replace(/\s/g, ''); // strip any spaces/newlines
+  
+  const extParts = mimeType.split('/');
+  let ext = extParts[1] || 'png';
+  if (ext.includes('+')) {
+    ext = ext.split('+')[0];
+  }
+  if (ext === 'jpeg') ext = 'jpg';
+
+  const filename = `${idPrefix}-${Date.now()}.${ext}`;
+
+  const cpanelUploadUrl = process.env.CPANEL_UPLOAD_URL;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction && cpanelUploadUrl) {
+    try {
+      console.log(`📤 Uploading base64 image ${filename} to cPanel...`);
+      const response = await fetch(cpanelUploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          base64: cleanStr,
+          filename: filename,
+          folder: folder
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`cPanel upload returned status ${response.status}: ${await response.text()}`);
+      }
+
+      const result = await response.json();
+      if (result.success && result.url) {
+        console.log(`✅ Uploaded to cPanel successfully: ${result.url}`);
+        return result.url;
+      } else {
+        throw new Error(result.error || 'Unknown cPanel upload error');
+      }
+    } catch (err) {
+      console.error('❌ Failed to upload base64 to cPanel, falling back to local storage:', err.message);
+    }
+  }
+
+  // Fallback to local storage (development mode)
+  const destPath = path.join(uploadsDir, filename);
+  fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
+  const appUrl = process.env.APP_URL || `http://localhost:${PORT || 5000}`;
+  return `${appUrl}/uploads/${filename}`;
+}
+
+// Intercept base64 fields in queries and replace them with local static or remote URLs
+async function processBase64FieldsAsync(dataRow, idPrefix) {
   if (!dataRow || typeof dataRow !== 'object') return dataRow;
   const row = { ...dataRow };
 
   if (row.profile_image && typeof row.profile_image === 'string' && row.profile_image.startsWith('data:image/')) {
-    const filename = saveBase64ToFile(row.profile_image, idPrefix || 'member');
-    if (filename) {
-      row.profile_image = `${appUrl}/uploads/${filename}`;
+    const url = await saveImage(row.profile_image, idPrefix || 'member', 'members');
+    if (url) {
+      row.profile_image = url;
     }
   }
   if (row.guest_profile_image && typeof row.guest_profile_image === 'string' && row.guest_profile_image.startsWith('data:image/')) {
-    const filename = saveBase64ToFile(row.guest_profile_image, idPrefix || 'guest');
-    if (filename) {
-      row.guest_profile_image = `${appUrl}/uploads/${filename}`;
+    const url = await saveImage(row.guest_profile_image, idPrefix || 'guest', 'guests');
+    if (url) {
+      row.guest_profile_image = url;
     }
   }
   if (row.image && typeof row.image === 'string' && row.image.startsWith('data:image/')) {
-    const filename = saveBase64ToFile(row.image, idPrefix || 'event');
-    if (filename) {
-      row.image = `${appUrl}/uploads/${filename}`;
+    const url = await saveImage(row.image, idPrefix || 'event', 'events');
+    if (url) {
+      row.image = url;
     }
   }
 
@@ -107,11 +169,60 @@ const upload = multer({
 });
 
 // 1. File Upload Endpoint (Mocks Supabase Storage)
-app.post('/api/storage/upload', upload.single('file'), (req, res) => {
+app.post('/api/storage/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+
+    const cpanelUploadUrl = process.env.CPANEL_UPLOAD_URL;
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (isProduction && cpanelUploadUrl) {
+      try {
+        console.log(`📤 Uploading file ${req.file.filename} to cPanel...`);
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const blob = new Blob([fileBuffer], { type: req.file.mimetype });
+        const formData = new FormData();
+        formData.append('file', blob, req.file.filename);
+
+        let folder = 'uploads';
+        const filenameLower = req.file.filename.toLowerCase();
+        if (filenameLower.includes('member')) folder = 'members';
+        else if (filenameLower.includes('event')) folder = 'events';
+        else if (filenameLower.includes('guest')) folder = 'guests';
+        formData.append('folder', folder);
+
+        const response = await fetch(cpanelUploadUrl, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`cPanel upload status ${response.status}: ${await response.text()}`);
+        }
+
+        const result = await response.json();
+        if (result.success && result.url) {
+          console.log(`✅ File uploaded to cPanel successfully: ${result.url}`);
+          // Clean up the local temporary file
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch (_) {}
+
+          return res.status(200).json({
+            path: result.path,
+            publicUrl: result.url
+          });
+        } else {
+          throw new Error(result.error || 'Unknown cPanel upload error');
+        }
+      } catch (err) {
+        console.error('❌ Failed to upload file to cPanel, falling back to local URL:', err.message);
+      }
+    }
+
+    // Fallback to local storage (development mode)
     const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
     const fileUrl = `${appUrl}/uploads/${req.file.filename}`;
     
@@ -569,14 +680,13 @@ app.post('/api/query', async (req, res) => {
       else if (action === 'insert') {
         const insertRows = Array.isArray(data) ? data : [data];
         const insertedResults = [];
-        const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
 
         for (const rawRow of insertRows) {
           let row = { ...rawRow };
           if (!row.id) {
             row.id = uuidv4();
           }
-          row = processBase64Fields(row, row.id, appUrl);
+          row = await processBase64FieldsAsync(row, row.id);
 
           const columns = Object.keys(row).map(c => `\`${c}\``).join(', ');
           const placeholders = Object.keys(row).map(() => '?').join(', ');
@@ -597,8 +707,7 @@ app.post('/api/query', async (req, res) => {
 
       // C. Build query for UPDATE
       else if (action === 'update') {
-        const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-        const updatedData = processBase64Fields(data, table, appUrl);
+        const updatedData = await processBase64FieldsAsync(data, table);
 
         const updateKeys = Object.keys(updatedData).map(k => `\`${k}\` = ?`).join(', ');
         const updateValues = Object.values(updatedData);
@@ -642,14 +751,13 @@ app.post('/api/query', async (req, res) => {
       else if (action === 'upsert') {
         const upsertRows = Array.isArray(data) ? data : [data];
         const upsertedResults = [];
-        const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
 
         for (const rawRow of upsertRows) {
           let row = { ...rawRow };
           if (!row.id) {
             row.id = uuidv4();
           }
-          row = processBase64Fields(row, row.id, appUrl);
+          row = await processBase64FieldsAsync(row, row.id);
 
           const columns = Object.keys(row).map(c => `\`${c}\``).join(', ');
           const placeholders = Object.keys(row).map(() => '?').join(', ');
