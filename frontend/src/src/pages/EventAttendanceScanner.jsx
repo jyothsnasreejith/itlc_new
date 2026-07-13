@@ -15,6 +15,7 @@ export default function EventAttendanceScanner() {
   const [manualMemberId, setManualMemberId] = useState('')
   const [stats, setStats] = useState({ registered: 0, checkedIn: 0 })
   const [cameraLoading, setCameraLoading] = useState(false)
+  const [giftClaimedInput, setGiftClaimedInput] = useState('no')
   const scannerRef = useRef(null)
   const html5QrCodeRef = useRef(null)
 
@@ -221,18 +222,32 @@ export default function EventAttendanceScanner() {
         .select('*')
         .eq('event_id', eventId)
         .eq('member_id', memberId)
-        .single()
+        .maybeSingle()
 
       if (existing) {
-        setScanResult({
-          success: false,
-          message: 'Already Checked In',
-          name: registration.member.full_name,
-          detail: `Checked in at ${new Date(existing.checked_in_at).toLocaleTimeString()}`,
-          memberId: memberId,
-          memberNumber: memberNumber,
-          member: registration.member
-        })
+        if (existing.checked_out || existing.checked_out_at) {
+          setScanResult({
+            success: false,
+            message: 'Already Checked Out',
+            name: registration.member.full_name,
+            detail: `Checked out at ${new Date(existing.checked_out_at).toLocaleTimeString()} (Gift Claimed: ${existing.gift_claimed === 'yes' ? 'Yes' : 'No'})`,
+            memberId: memberId,
+            memberNumber: memberNumber,
+            member: registration.member
+          })
+        } else {
+          setGiftClaimedInput('no')
+          setScanResult({
+            success: true,
+            isCheckoutPrompt: true,
+            attendanceId: existing.id,
+            name: registration.member.full_name,
+            checkedInTime: existing.checked_in_at,
+            memberId: memberId,
+            memberNumber: memberNumber,
+            member: registration.member
+          })
+        }
         return
       }
 
@@ -271,6 +286,32 @@ export default function EventAttendanceScanner() {
         detail: 'Failed to mark attendance. Please try again.',
         memberId: memberId
       })
+    }
+  }
+
+  async function handleCheckout(attendanceId, giftClaimed) {
+    try {
+      const { error } = await supabase
+        .from('event_attendance')
+        .update({
+          checked_out: true,
+          checked_out_at: new Date().toISOString(),
+          gift_claimed: giftClaimed
+        })
+        .eq('id', attendanceId)
+
+      if (error) throw error
+
+      setScanResult(null)
+      alert('Checkout processed successfully!')
+      fetchAttendees()
+      fetchStats()
+      if (!isScanning) {
+        startScanning()
+      }
+    } catch (error) {
+      console.error('Error processing checkout:', error)
+      alert('Failed to process checkout: ' + error.message)
     }
   }
 
@@ -538,7 +579,55 @@ export default function EventAttendanceScanner() {
               )}
 
               {/* Status Message */}
-              {scanResult.success ? (
+              {scanResult.isCheckoutPrompt ? (
+                <div className="flex flex-col gap-4 p-4 mb-4 bg-primary/10 border-2 border-primary/30 rounded-xl text-left">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-primary/20">
+                      <span className="material-symbols-outlined text-3xl">logout</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-primary font-bold text-lg leading-tight">
+                        Check-Out Prompt
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Already checked in at {new Date(scanResult.checkedInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                      </p>
+                    </div>
+                  </div>
+
+                  {event?.gift === 'yes' && (
+                    <div className="border-t border-slate-200 dark:border-slate-800 pt-3 mt-1">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                        Gift claimed or not?
+                      </p>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="giftClaimed"
+                            value="yes"
+                            checked={giftClaimedInput === 'yes'}
+                            onChange={() => setGiftClaimedInput('yes')}
+                            className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                          />
+                          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Yes, Claimed</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="giftClaimed"
+                            value="no"
+                            checked={giftClaimedInput === 'no'}
+                            onChange={() => setGiftClaimedInput('no')}
+                            className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                          />
+                          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">No, Not Claimed</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : scanResult.success ? (
                 <div className="flex items-center gap-4 p-4 mb-4 bg-green-500/10 border-2 border-green-500/30 rounded-xl">
                   <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/20">
                     <span className="material-symbols-outlined text-3xl">check_circle</span>
@@ -570,19 +659,37 @@ export default function EventAttendanceScanner() {
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <button
-                  onClick={handleContinueScanning}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
-                >
-                  Continue Scanning
-                </button>
-                {scanResult.member && (
+                {scanResult.isCheckoutPrompt ? (
                   <button
-                    onClick={() => navigate(`/member/${scanResult.memberId}`)}
+                    onClick={() => handleCheckout(scanResult.attendanceId, event?.gift === 'yes' ? giftClaimedInput : 'no')}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-red-600/20 transition-all active:scale-[0.98]"
+                  >
+                    Confirm Check-Out
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleContinueScanning}
+                    className="flex-1 bg-primary hover:bg-primary/90 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
+                  >
+                    Continue Scanning
+                  </button>
+                )}
+                {scanResult.isCheckoutPrompt ? (
+                  <button
+                    onClick={handleContinueScanning}
                     className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-4 rounded-xl font-bold text-sm transition-all"
                   >
-                    View Profile
+                    Cancel
                   </button>
+                ) : (
+                  scanResult.member && (
+                    <button
+                      onClick={() => navigate(`/member/${scanResult.memberId}`)}
+                      className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-4 rounded-xl font-bold text-sm transition-all"
+                    >
+                      View Profile
+                    </button>
+                  )
                 )}
               </div>
             </div>

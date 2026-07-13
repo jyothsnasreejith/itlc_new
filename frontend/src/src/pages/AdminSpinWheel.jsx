@@ -208,7 +208,8 @@ export default function AdminSpinWheel() {
         if (att) {
           present.push({
             ...person,
-            checkedInAt: att.checked_in_at
+            checkedInAt: att.checked_in_at,
+            attendanceId: att.id
           })
         }
       })
@@ -452,6 +453,21 @@ export default function AdminSpinWheel() {
       next.add(id)
     }
     setExcludedIds(next)
+  }
+
+  const claimWinner = async (winnerObj) => {
+    if (!winnerObj || !winnerObj.attendanceId) return
+    try {
+      const { error } = await supabase
+        .from('event_attendance')
+        .update({ lucky_draw_winner: true })
+        .eq('id', winnerObj.attendanceId)
+      if (error) throw error
+      console.log('✓ Winner successfully saved to database:', winnerObj.full_name)
+    } catch (err) {
+      console.error('Error claiming winner:', err)
+      alert('Failed to save winner to database: ' + err.message)
+    }
   }
 
   const selectAll = () => {
@@ -754,13 +770,14 @@ export default function AdminSpinWheel() {
               {/* Action Buttons */}
               <div className="flex flex-col gap-2 w-full">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    await claimWinner(winner)
                     toggleExclude(winner.id) // Exclude winner
                     setShowWinnerModal(false)
                   }}
                   className="w-full bg-primary hover:bg-primary/95 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-primary/20"
                 >
-                  Exclude & Spin Again
+                  Claim & Exclude Winner
                 </button>
                 <button
                   onClick={() => setShowWinnerModal(false)}

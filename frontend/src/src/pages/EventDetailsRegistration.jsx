@@ -81,47 +81,47 @@ export default function EventDetailsRegistration() {
     setLoading(true)
     try {
       let eventData = null
-      
+
       // Check if id is a slug (contains hyphens but not a full UUID) or a UUID
       const parts = id.split('-')
       const isFullUuid = parts.length === 5 && parts[0].length === 8 && parts[1].length === 4
-      
+
       if (!isFullUuid) {
         // This is a slug, extract short ID from the end
         const shortId = parts[parts.length - 1]
-        
+
         console.log('Slug detected:', id)
         console.log('Extracted shortId:', shortId)
-        
+
         // Try method 1: Reconstruct UUID for test data pattern (e3333333 -> e3333333-3333-3333-3333-333333333333)
         if (shortId.length === 8 && shortId[0] === shortId[1]) {
           const firstChar = shortId[0]
           const repeatChar = shortId[1]
           const fullUuid = `${shortId}-${repeatChar.repeat(4)}-${repeatChar.repeat(4)}-${repeatChar.repeat(4)}-${repeatChar.repeat(12)}`
-          
+
           console.log('Trying pattern-based UUID:', fullUuid)
-          
+
           const { data, error } = await supabase
             .from('events')
             .select('*')
             .eq('id', fullUuid)
             .maybeSingle()
-          
+
           if (!error && data) {
             eventData = data
             console.log('Event found via pattern match:', eventData)
           }
         }
-        
+
         // Method 2: If pattern match fails, try to get all events and match client-side
         if (!eventData && shortId.length >= 8) {
           console.log('Trying client-side UUID match for shortId:', shortId)
-          
+
           // Fetch all events and match on client side
           const { data: allEvents, error: fetchError } = await supabase
             .from('events')
             .select('*')
-          
+
           if (!fetchError && allEvents) {
             // Find event where UUID starts with the shortId
             eventData = allEvents.find(event => event.id.toLowerCase().startsWith(shortId.toLowerCase()))
@@ -132,14 +132,14 @@ export default function EventDetailsRegistration() {
             console.error('Error fetching events:', fetchError)
           }
         }
-        
+
         // Method 3: Try RPC function if available (requires CREATE_SLUG_SEARCH_FUNCTION.sql)
         if (!eventData && shortId.length >= 8) {
           console.log('Trying RPC search for shortId:', shortId)
-          
+
           const { data, error } = await supabase
             .rpc('find_event_by_slug', { slug_id: shortId })
-          
+
           if (!error && data && data.length > 0) {
             eventData = data[0]
             console.log('Event found via RPC:', eventData)
@@ -155,11 +155,11 @@ export default function EventDetailsRegistration() {
           .select('*')
           .eq('id', id)
           .single()
-        
+
         if (error) throw error
         eventData = data
       }
-      
+
       // Set event data or show error
       if (eventData) {
         setEvent(eventData)
@@ -230,11 +230,11 @@ export default function EventDetailsRegistration() {
     }
     // Otherwise, format ISO date
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       weekday: 'long',
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     })
   }
 
@@ -256,7 +256,7 @@ export default function EventDetailsRegistration() {
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
             The event you're looking for doesn't exist or hasn't been created yet.
           </p>
-          <button 
+          <button
             onClick={() => navigate('/events')}
             className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
@@ -272,7 +272,7 @@ export default function EventDetailsRegistration() {
       {/* Header */}
       <div className="flex items-center bg-background-light dark:bg-background-dark p-4 lg:px-8 justify-between border-b border-slate-200 dark:border-slate-800">
         {!isPublicRoute && (
-          <div 
+          <div
             onClick={() => navigate(-1)}
             className="text-slate-900 dark:text-slate-100 flex size-10 shrink-0 items-center cursor-pointer"
           >
@@ -294,7 +294,7 @@ export default function EventDetailsRegistration() {
         {/* Hero Image */}
         <div className="@container">
           <div className="px-0">
-            <div 
+            <div
               className="w-full bg-center bg-no-repeat bg-cover flex flex-col justify-end aspect-video bg-slate-200 dark:bg-slate-800"
               style={{ backgroundImage: `url("${event.image || DEFAULT_EVENT_IMAGE}")` }}
             />
@@ -306,7 +306,7 @@ export default function EventDetailsRegistration() {
           <h1 className="text-slate-900 dark:text-slate-100 tracking-tight text-2xl lg:text-3xl font-bold leading-tight mb-4">
             {event.title}
           </h1>
-          
+
           <div className="grid md:grid-cols-2 gap-4">
             <div className="flex items-center gap-4">
               <div className="text-primary flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-12">
@@ -317,7 +317,7 @@ export default function EventDetailsRegistration() {
                 <p className="text-slate-500 dark:text-slate-400 text-sm">{event.time || 'Time TBD'}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-primary flex items-center justify-center rounded-lg bg-primary/10 shrink-0 size-12">
                 <span className="material-symbols-outlined">location_on</span>
@@ -357,13 +357,12 @@ export default function EventDetailsRegistration() {
                 </h3>
                 {event.max_registrations && (
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`text-xs lg:text-sm px-3 py-1 rounded-full font-medium ${
-                      registrationStats.total >= event.max_registrations
+                    <span className={`text-xs lg:text-sm px-3 py-1 rounded-full font-medium ${registrationStats.total >= event.max_registrations
                         ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                         : registrationStats.total >= event.max_registrations * 0.8
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    }`}>
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      }`}>
                       {registrationStats.total} / {event.max_registrations} Applications
                     </span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -441,8 +440,8 @@ export default function EventDetailsRegistration() {
           disabled={event.max_registrations && registrationStats.total >= event.max_registrations}
           className="w-full bg-primary hover:bg-primary/90 text-white py-3 px-4 rounded-xl font-bold text-base shadow-lg shadow-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {event.max_registrations && registrationStats.total >= event.max_registrations 
-            ? 'Event is Full' 
+          {event.max_registrations && registrationStats.total >= event.max_registrations
+            ? 'Event is Full'
             : 'Register for Event'}
         </button>
       </div>

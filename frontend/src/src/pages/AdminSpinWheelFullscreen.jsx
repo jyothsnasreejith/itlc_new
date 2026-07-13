@@ -158,7 +158,8 @@ export default function AdminSpinWheelFullscreen() {
         if (att) {
           present.push({
             ...person,
-            checkedInAt: att.checked_in_at
+            checkedInAt: att.checked_in_at,
+            attendanceId: att.id
           })
         }
       })
@@ -498,8 +499,21 @@ export default function AdminSpinWheelFullscreen() {
     return () => cancelAnimationFrame(animId)
   }, [showWinnerModal])
 
-  const excludeWinner = () => {
+  const excludeWinner = async () => {
     if (winner) {
+      if (winner.attendanceId) {
+        try {
+          const { error } = await supabase
+            .from('event_attendance')
+            .update({ lucky_draw_winner: true })
+            .eq('id', winner.attendanceId)
+          if (error) throw error
+          console.log('✓ Winner successfully saved to database:', winner.full_name)
+        } catch (err) {
+          console.error('Error claiming winner:', err)
+          alert('Failed to save winner to database: ' + err.message)
+        }
+      }
       const next = new Set(excludedIds)
       next.add(winner.id)
       setExcludedIds(next)

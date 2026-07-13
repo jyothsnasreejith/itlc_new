@@ -14,7 +14,8 @@ export default function AdminCreateNewEvent() {
     address: '',
     maxRegistrations: '',
     fee: '',
-    autoShare: true
+    autoShare: true,
+    gift: 'no'
   })
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -66,7 +67,8 @@ export default function AdminCreateNewEvent() {
             fee: formData.fee ? parseFloat(formData.fee) : 0,
             auto_share: formData.autoShare,
             status: 'upcoming',
-            image: imagePreview || null
+            image: imagePreview || null,
+            gift: formData.gift
           }
         ])
         .select()
@@ -281,6 +283,41 @@ export default function AdminCreateNewEvent() {
                 Enter the registration fee in INR. Leave empty or 0 for free events.
               </p>
             </label>
+          </div>
+
+          <div className="flex flex-col gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-slate-900 dark:text-slate-100 text-base font-semibold leading-tight">
+                Gift for Attendees?
+              </p>
+              <p className="text-slate-500 dark:text-slate-400 text-xs">
+                Does this event include a gift for present attendees?
+              </p>
+            </div>
+            <div className="flex gap-6 mt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gift"
+                  value="yes"
+                  checked={formData.gift === 'yes'}
+                  onChange={handleChange}
+                  className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                />
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Yes</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gift"
+                  value="no"
+                  checked={formData.gift === 'no'}
+                  onChange={handleChange}
+                  className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                />
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">No</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20">

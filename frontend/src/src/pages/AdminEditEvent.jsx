@@ -16,7 +16,8 @@ export default function AdminEditEvent() {
     maxRegistrations: '',
     fee: '',
     autoShare: true,
-    status: 'upcoming'
+    status: 'upcoming',
+    gift: 'no'
   })
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -51,7 +52,8 @@ export default function AdminEditEvent() {
           maxRegistrations: data.max_registrations || '',
           fee: data.fee != null ? data.fee : '',
           autoShare: data.auto_share || false,
-          status: data.status || 'upcoming'
+          status: data.status || 'upcoming',
+          gift: data.gift || 'no'
         })
         if (data.image) {
           setImagePreview(data.image)
@@ -112,6 +114,7 @@ export default function AdminEditEvent() {
           auto_share: formData.autoShare,
           status: formData.status,
           image: imagePreview || null,
+          gift: formData.gift,
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
@@ -380,6 +383,41 @@ export default function AdminEditEvent() {
                 <option value="cancelled">Cancelled</option>
               </select>
             </label>
+          </div>
+
+          <div className="flex flex-col gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-slate-900 dark:text-slate-100 text-base font-semibold leading-tight">
+                Gift for Attendees?
+              </p>
+              <p className="text-slate-500 dark:text-slate-400 text-xs">
+                Does this event include a gift for present attendees?
+              </p>
+            </div>
+            <div className="flex gap-6 mt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gift"
+                  value="yes"
+                  checked={formData.gift === 'yes'}
+                  onChange={handleChange}
+                  className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                />
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Yes</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="gift"
+                  value="no"
+                  checked={formData.gift === 'no'}
+                  onChange={handleChange}
+                  className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                />
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">No</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20">

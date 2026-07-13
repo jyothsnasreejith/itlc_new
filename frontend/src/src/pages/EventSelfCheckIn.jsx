@@ -13,6 +13,7 @@ export default function EventSelfCheckIn() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [giftClaimedInput, setGiftClaimedInput] = useState('no')
 
   useEffect(() => {
     fetchEvent()
@@ -152,11 +153,23 @@ export default function EventSelfCheckIn() {
         .maybeSingle()
 
       if (existing) {
-        setResult({
-          name: isMember ? matchInfo.member.full_name : matchInfo.registration.guest_name,
-          checkedInAt: existing.checked_in_at
-        })
-        setStep('already')
+        if (existing.checked_out || existing.checked_out_at) {
+          setResult({
+            name: isMember ? matchInfo.member.full_name : matchInfo.registration.guest_name,
+            checkedInAt: existing.checked_in_at,
+            checkedOutAt: existing.checked_out_at,
+            giftClaimed: existing.gift_claimed
+          })
+          setStep('already-checked-out')
+        } else {
+          setGiftClaimedInput('no')
+          setResult({
+            id: existing.id,
+            name: isMember ? matchInfo.member.full_name : matchInfo.registration.guest_name,
+            checkedInAt: existing.checked_in_at
+          })
+          setStep('checkout-prompt')
+        }
         return
       }
 
@@ -191,6 +204,38 @@ export default function EventSelfCheckIn() {
     } catch (err) {
       console.error('Error checking in:', err)
       setError('Failed to check in. Please try again or ask event staff for help.')
+    }
+  }
+
+  async function handleSelfCheckout() {
+    setLoading(true)
+    setError('')
+    try {
+      const { data: updated, error: updateError } = await supabase
+        .from('event_attendance')
+        .update({
+          checked_out: true,
+          checked_out_at: new Date().toISOString(),
+          gift_claimed: event?.gift === 'yes' ? giftClaimedInput : 'no'
+        })
+        .eq('id', result.id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+
+      setResult({
+        name: result.name,
+        checkedInAt: updated.checked_in_at,
+        checkedOutAt: updated.checked_out_at,
+        giftClaimed: updated.gift_claimed
+      })
+      setStep('checkout-success')
+    } catch (err) {
+      console.error('Error checking out:', err)
+      setError('Failed to check out. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -287,6 +332,96 @@ export default function EventSelfCheckIn() {
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {result?.name} checked in at {formatTime(result?.checkedInAt)}
               </p>
+            </div>
+          )}
+
+          {step === 'checkout-prompt' && (
+            <div>
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-3">
+                  <span className="material-symbols-outlined text-4xl text-primary">logout</span>
+                </div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Check-Out</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {result?.name} is checked in at {formatTime(result?.checkedInAt)}.
+                </p>
+              </div>
+
+              {event?.gift === 'yes' && (
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mb-4">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mb-2 text-center">
+                    Have you claimed your gift?
+                  </p>
+                  <div className="flex justify-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="giftClaimed"
+                        value="yes"
+                        checked={giftClaimedInput === 'yes'}
+                        onChange={() => setGiftClaimedInput('yes')}
+                        className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                      />
+                      <span className="text-sm font-medium text-slate-900 dark:text-white">Yes, Claimed</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="giftClaimed"
+                        value="no"
+                        checked={giftClaimedInput === 'no'}
+                        onChange={() => setGiftClaimedInput('no')}
+                        className="rounded-full border-slate-300 text-primary focus:ring-primary size-4"
+                      />
+                      <span className="text-sm font-medium text-slate-900 dark:text-white">No, Not Claimed</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {error && <p className="text-sm text-red-500 mb-3 text-center">{error}</p>}
+
+              <button
+                onClick={handleSelfCheckout}
+                disabled={loading}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-bold py-3 rounded-lg transition-colors"
+              >
+                {loading ? 'Processing...' : 'Confirm Check-Out'}
+              </button>
+            </div>
+          )}
+
+          {step === 'checkout-success' && (
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4">
+                <span className="material-symbols-outlined text-4xl text-green-500">check_circle</span>
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Check-Out Complete!</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                {result?.name} checked out at {formatTime(result?.checkedOutAt)}.
+              </p>
+              {event?.gift === 'yes' && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Gift Claimed: {result?.giftClaimed === 'yes' ? 'Yes' : 'No'}
+                </p>
+              )}
+            </div>
+          )}
+
+          {step === 'already-checked-out' && (
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-500/10 mb-4">
+                <span className="material-symbols-outlined text-4xl text-slate-500">logout</span>
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Already checked out</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {result?.name} checked out at {formatTime(result?.checkedOutAt)}
+              </p>
+              {event?.gift === 'yes' && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Gift Claimed: {result?.giftClaimed === 'yes' ? 'Yes' : 'No'}
+                </p>
+              )}
             </div>
           )}
 

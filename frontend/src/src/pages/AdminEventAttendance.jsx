@@ -91,7 +91,15 @@ export default function AdminEventAttendance() {
         const att = isMember ? attendanceByMember.get(reg.member_id) : attendanceByRegistration.get(reg.id)
 
         if (att) {
-          present.push({ ...person, checkedInAt: att.checked_in_at, checkInMethod: att.check_in_method || 'staff_scan' })
+          present.push({ 
+            ...person, 
+            checkedInAt: att.checked_in_at, 
+            checkInMethod: att.check_in_method || 'staff_scan',
+            checkedOut: att.checked_out,
+            checkedOutAt: att.checked_out_at,
+            giftClaimed: att.gift_claimed,
+            luckyDrawWinner: att.lucky_draw_winner
+          })
         } else {
           absent.push(person)
         }
@@ -107,6 +115,62 @@ export default function AdminEventAttendance() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleExportToExcel = () => {
+    const headers = [
+      'Name',
+      'Type',
+      'Email',
+      'Phone',
+      'Designation',
+      'Status',
+      'Check-In Time',
+      'Check-Out Time',
+      'Gift Claimed',
+      'Lucky Winner'
+    ]
+
+    const rows = presentAttendees.map(p => [
+      p.full_name,
+      p.isGuest ? 'Guest' : 'Member',
+      p.email || '',
+      p.phone_number || '',
+      p.designation || '',
+      p.checkedOutAt || p.checkedOut ? 'Checked Out' : 'Present',
+      p.checkedInAt ? formatTime(p.checkedInAt) : '',
+      p.checkedOutAt ? formatTime(p.checkedOutAt) : '',
+      event?.gift === 'yes' ? (p.giftClaimed === 'yes' ? 'Yes' : 'No') : 'N/A',
+      p.luckyDrawWinner ? 'Yes' : 'No'
+    ]).concat(
+      absentAttendees.map(p => [
+        p.full_name,
+        p.isGuest ? 'Guest' : 'Member',
+        p.email || '',
+        p.phone_number || '',
+        p.designation || '',
+        'Absent',
+        '',
+        '',
+        'N/A',
+        'No'
+      ])
+    )
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${(event?.title || 'event').replace(/\s+/g, '-').toLowerCase()}-attendance-report.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const filterPeople = (people) => {
@@ -200,7 +264,55 @@ export default function AdminEventAttendance() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Lucky Draw Winners Section */}
+        {!loading && (
+          <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-500 text-2xl animate-bounce">military_tech</span>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Lucky Draw Winners</h2>
+              </div>
+              <button
+                onClick={() => navigate('/admin/spin-wheel')}
+                className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-xs">casino</span>
+                Draw Arena
+              </button>
+            </div>
+            
+            {presentAttendees.filter(p => p.luckyDrawWinner).length === 0 ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                No winners have been selected for this event yet. Open the Lucky Draw Arena to spin the wheel!
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {presentAttendees
+                  .filter(p => p.luckyDrawWinner)
+                  .map(winner => (
+                    <div key={winner.id} className="bg-white dark:bg-slate-800 border border-amber-500/30 rounded-xl p-4 flex items-center gap-3 shadow-sm relative overflow-hidden">
+                      <div className="absolute -right-4 -bottom-4 w-12 h-12 bg-amber-500/10 rounded-full blur-md"></div>
+                      
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-amber-500/10 border border-amber-500/30 flex-shrink-0 flex items-center justify-center">
+                        {winner.profile_image ? (
+                          <img src={winner.profile_image} alt={winner.full_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="material-symbols-outlined text-amber-600 text-xl">person</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{winner.full_name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{winner.designation || 'Attendee'}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-amber-500 text-2xl">workspace_premium</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
@@ -212,9 +324,9 @@ export default function AdminEventAttendance() {
           </div>
         ) : (
           <>
-            {/* Search Bar */}
-            <div className="mb-6">
-              <div className="relative">
+            {/* Search Bar & Export button */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="relative flex-1">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   search
                 </span>
@@ -226,6 +338,13 @@ export default function AdminEventAttendance() {
                   className="w-full pl-11 pr-4 py-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                 />
               </div>
+              <button
+                onClick={handleExportToExcel}
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-3 rounded-lg transition-all shadow-md hover:shadow-lg active:scale-[0.99] cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined">download</span>
+                Export Excel
+              </button>
             </div>
 
             {/* Tabs */}
@@ -258,7 +377,7 @@ export default function AdminEventAttendance() {
               </button>
             </div>
 
-            {/* List */}
+            {/* Table View with fixed height scroll */}
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
               {activeTab === 'present' ? (
                 filteredPresent.length === 0 ? (
@@ -271,47 +390,114 @@ export default function AdminEventAttendance() {
                     </p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredPresent.map((person) => (
-                      <div key={person.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
-                            {person.profile_image ? (
-                              <img src={person.profile_image} alt={person.full_name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="material-symbols-outlined text-2xl text-slate-400">person</span>
+                  <div className="max-h-[500px] overflow-y-auto overflow-x-auto relative">
+                    <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400 border-collapse">
+                      <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700/80 sticky top-0 z-10">
+                        <tr>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Name</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Contact Details</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Designation</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Status</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Check-In</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Check-Out</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Gift Claimed</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Winner</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                        {filteredPresent.map((person) => (
+                          <tr key={person.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors">
+                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
+                                  {person.profile_image ? (
+                                    <img src={person.profile_image} alt={person.full_name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <span className="material-symbols-outlined text-xl text-slate-400">person</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-bold flex items-center gap-1.5">
+                                    {person.full_name}
+                                    {person.isGuest && (
+                                      <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
+                                        Guest
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-2">
-                              {person.full_name}
-                              {person.isGuest && (
-                                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                                  Guest
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350">
+                              <div>{person.email || 'N/A'}</div>
+                              <div className="text-slate-400 mt-0.5">{person.phone_number || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350 whitespace-nowrap">
+                              {person.designation || (person.isGuest ? 'Guest' : 'Member')}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {person.checkedOutAt || person.checkedOut ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/50">
+                                  Checked Out
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700">
+                                  Active In Event
                                 </span>
                               )}
-                            </div>
-                            <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                              {person.designation || (person.isGuest ? 'Guest' : 'Member')}
-                            </div>
-                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">
-                              {person.phone_number || person.email}
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400 mb-1">
-                              <span className="material-symbols-outlined text-sm">check_circle</span>
-                              <span className="text-xs font-semibold">{formatTime(person.checkedInAt)}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500">
-                              {methodLabel(person.checkInMethod)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-1 text-green-600 dark:text-green-400 font-bold text-xs mb-0.5">
+                                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                <span>{formatTime(person.checkedInAt)}</span>
+                              </div>
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider">
+                                {methodLabel(person.checkInMethod)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350 whitespace-nowrap">
+                              {person.checkedOutAt ? (
+                                <div className="flex items-center gap-1 text-red-500 font-bold">
+                                  <span className="material-symbols-outlined text-[14px]">logout</span>
+                                  <span>{formatTime(person.checkedOutAt)}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 font-normal">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {event?.gift === 'yes' ? (
+                                person.giftClaimed === 'yes' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/50">
+                                    <span className="material-symbols-outlined text-[12px]">card_membership</span>
+                                    Claimed
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/50">
+                                    <span className="material-symbols-outlined text-[12px]">card_membership</span>
+                                    Unclaimed
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-xs text-slate-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {person.luckyDrawWinner ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse">
+                                  <span className="material-symbols-outlined text-[12px] fill-[1]">workspace_premium</span>
+                                  Winner
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )
               ) : (
@@ -325,44 +511,66 @@ export default function AdminEventAttendance() {
                     </p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredAbsent.map((person) => (
-                      <div key={person.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
-                            {person.profile_image ? (
-                              <img src={person.profile_image} alt={person.full_name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="material-symbols-outlined text-2xl text-slate-400">person</span>
+                  <div className="max-h-[500px] overflow-y-auto overflow-x-auto relative">
+                    <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400 border-collapse">
+                      <thead className="text-xs text-slate-700 dark:text-slate-300 uppercase bg-slate-50 dark:bg-slate-700/80 sticky top-0 z-10">
+                        <tr>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Name</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Contact Details</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Designation</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Status</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Gift Claimed</th>
+                          <th scope="col" className="px-6 py-4 bg-slate-50 dark:bg-slate-700 font-bold border-b border-slate-200 dark:border-slate-600">Winner</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                        {filteredAbsent.map((person) => (
+                          <tr key={person.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition-colors">
+                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
+                                  {person.profile_image ? (
+                                    <img src={person.profile_image} alt={person.full_name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <span className="material-symbols-outlined text-xl text-slate-400">person</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-bold flex items-center gap-1.5">
+                                    {person.full_name}
+                                    {person.isGuest && (
+                                      <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
+                                        Guest
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-slate-900 dark:text-white truncate flex items-center gap-2">
-                              {person.full_name}
-                              {person.isGuest && (
-                                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                                  Guest
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350">
+                              <div>{person.email || 'N/A'}</div>
+                              <div className="text-slate-400 mt-0.5">{person.phone_number || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350 whitespace-nowrap">
                               {person.designation || (person.isGuest ? 'Guest' : 'Member')}
-                            </div>
-                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">
-                              {person.phone_number || person.email}
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0">
-                            <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                              <span className="material-symbols-outlined text-sm">cancel</span>
-                              <span className="text-xs font-semibold">Not Checked In</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-650 dark:text-red-400 border border-red-200/50 dark:border-red-900/50">
+                                Absent
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                              —
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                              —
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )
               )}

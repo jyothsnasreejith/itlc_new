@@ -340,7 +340,7 @@ export default function Dashboard() {
               recentEvents.map(event => (
                 <div
                   key={event.id}
-                  onClick={() => navigate(`/event/${event.id}`)}
+                  onClick={() => navigate(`/admin/event-registrations/${event.id}`)}
                   className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors cursor-pointer"
                 >
                   <div className="flex gap-3">

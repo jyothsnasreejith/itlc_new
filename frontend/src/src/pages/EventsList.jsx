@@ -341,8 +341,7 @@ export default function EventsList() {
   }
 
   const handleEventClick = (event) => {
-    const slug = generateSlug(event.title, event.id)
-    navigate(`/event/${slug}`)
+    navigate(`/admin/event-registrations/${event.id}`)
   }
 
   const openMembersModal = async (event) => {
