@@ -17,6 +17,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Check if running in a serverless environment (like Vercel) where the filesystem is read-only
+const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production' || process.env.NOW_REGION !== undefined;
+
 // Enable CORS
 app.use(cors({
   origin: '*',
@@ -28,14 +31,37 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Ensure uploads folder exists
+// Ensure uploads folder exists (skip in serverless environments to prevent EROFS errors)
 const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+if (!isServerless && !fs.existsSync(uploadsDir)) {
+  try {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create uploads directory:', err.message);
+  }
 }
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(uploadsDir));
+// Serve uploaded files statically (checks local files first, redirects to cPanel if not found)
+app.get('/uploads/:filename', (req, res) => {
+  const { filename } = req.params;
+  const localPath = path.join(uploadsDir, filename);
+  if (fs.existsSync(localPath)) {
+    return res.sendFile(localPath);
+  }
+
+  const cpanelUrl = process.env.CPANEL_UPLOAD_URL;
+  if (cpanelUrl) {
+    const filenameLower = filename.toLowerCase();
+    let folder = 'members';
+    if (filenameLower.includes('event')) {
+      folder = 'events';
+    }
+    const cpanelBase = cpanelUrl.substring(0, cpanelUrl.lastIndexOf('/'));
+    return res.redirect(`${cpanelBase}/${folder}/${filename}`);
+  }
+
+  return res.status(404).send('File not found');
+});
 
 // Helper to safely write base64 image data to a file and return the filename
 function saveBase64ToFile(base64Str, idPrefix) {
@@ -84,13 +110,8 @@ async function saveImage(base64Str, idPrefix, folder) {
   const filename = `${idPrefix}-${Date.now()}.${ext}`;
 
   const cpanelUploadUrl = process.env.CPANEL_UPLOAD_URL;
-  const isProduction = process.env.NODE_ENV === 'production';
 
-  if (isProduction) {
-    if (!cpanelUploadUrl) {
-      console.error('❌ Error: CPANEL_UPLOAD_URL is not set in environment variables.');
-      return null;
-    }
+  if (cpanelUploadUrl) {
     try {
       console.log(`📤 Uploading base64 image ${filename} to cPanel...`);
       const response = await fetch(cpanelUploadUrl, {
@@ -118,10 +139,15 @@ async function saveImage(base64Str, idPrefix, folder) {
       }
     } catch (err) {
       console.error('❌ Failed to upload base64 to cPanel:', err.message);
-      return null;
+      if (isServerless) {
+        return null;
+      }
     }
-  } else {
-    // Fallback to local storage (development mode only)
+  }
+
+  // Fallback to local storage (development mode only, if cpanelUploadUrl is not set or failed)
+  if (!isServerless) {
+    console.log(`💾 Falling back to local storage for image ${filename}...`);
     const destPath = path.join(uploadsDir, filename);
     fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
     const appUrl = process.env.APP_URL || `http://localhost:${PORT || 5000}`;
@@ -156,9 +182,8 @@ async function processBase64FieldsAsync(dataRow, idPrefix) {
   return row;
 }
 
-// Multer Storage Configuration (Memory in production, Disk in development)
-const isProduction = process.env.NODE_ENV === 'production';
-const storage = isProduction
+// Multer Storage Configuration (Memory in serverless/cPanel mode, Disk in local development fallback)
+const storage = (isServerless || process.env.CPANEL_UPLOAD_URL)
   ? multer.memoryStorage()
   : multer.diskStorage({
       destination: (req, file, cb) => {
@@ -185,7 +210,7 @@ app.post('/api/storage/upload', upload.single('file'), async (req, res) => {
 
     const cpanelUploadUrl = process.env.CPANEL_UPLOAD_URL;
 
-    if (isProduction && cpanelUploadUrl) {
+    if (cpanelUploadUrl) {
       try {
         // Generate a clean filename for cPanel
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -226,18 +251,24 @@ app.post('/api/storage/upload', upload.single('file'), async (req, res) => {
         }
       } catch (err) {
         console.error('❌ Failed to upload file to cPanel:', err.message);
-        return res.status(500).json({ error: 'cPanel upload failed: ' + err.message });
+        if (isServerless) {
+          return res.status(500).json({ error: 'cPanel upload failed: ' + err.message });
+        }
       }
     }
 
     // Fallback to local storage (development mode)
-    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-    const fileUrl = `${appUrl}/uploads/${req.file.filename}`;
-    
-    return res.status(200).json({
-      path: `uploads/${req.file.filename}`,
-      publicUrl: fileUrl
-    });
+    if (!isServerless && req.file && req.file.filename) {
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      const fileUrl = `${appUrl}/uploads/${req.file.filename}`;
+      
+      return res.status(200).json({
+        path: `uploads/${req.file.filename}`,
+        publicUrl: fileUrl
+      });
+    }
+
+    return res.status(500).json({ error: 'cPanel upload failed and local storage is not available in serverless mode.' });
   } catch (err) {
     console.error('Upload Error:', err);
     return res.status(500).json({ error: err.message });
@@ -1025,10 +1056,10 @@ async function repairProfileImages() {
 
 app.listen(PORT, async () => {
   console.log(`ITLC Backend Server running on port ${PORT}`);
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isServerless) {
     await repairProfileImages();
   } else {
-    console.log('🚀 Production mode: Skipping startup profile image repair scan.');
+    console.log('🚀 Serverless/Production mode: Skipping startup profile image repair scan.');
   }
 });
 
