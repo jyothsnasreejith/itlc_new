@@ -18,6 +18,7 @@ import MemberProfileActivityLog from './pages/MemberProfileActivityLog'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
 import EventManagerDashboard from './pages/EventManagerDashboard'
+import AdminCertificateTemplates from './pages/AdminCertificateTemplates'
 import EventManagerAttendance from './pages/EventManagerAttendance'
 import PublicProfileUpdate from './pages/PublicProfileUpdate'
 import AdminUserManagement from './pages/AdminUserManagement'
@@ -73,6 +74,7 @@ function App() {
       <Route path="/member/profile/:id" element={<AdminProtectedRoute><MemberProfileActivityLog /></AdminProtectedRoute>} />
       <Route path="/member/:id" element={<AdminProtectedRoute><MemberProfileActivityLog /></AdminProtectedRoute>} />
       <Route path="/settings" element={<AdminProtectedRoute><Settings /></AdminProtectedRoute>} />
+      <Route path="/admin/certificate-templates" element={<AdminProtectedRoute><AdminCertificateTemplates /></AdminProtectedRoute>} />
     </Routes>
   )
 }

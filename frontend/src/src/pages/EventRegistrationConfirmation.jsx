@@ -330,7 +330,27 @@ export default function EventRegistrationConfirmation() {
     }
   }
 
-  function openRazorpayCheckout({ amount, name, email, contact, description }) {
+  async function openRazorpayCheckout({ amount, name, email, contact, description }) {
+    // Dynamic script loading
+    const loadScript = () => {
+      return new Promise((resolve) => {
+        if (window.Razorpay) {
+          resolve(true)
+          return
+        }
+        const script = document.createElement('script')
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+        script.onload = () => resolve(true)
+        script.onerror = () => resolve(false)
+        document.body.appendChild(script)
+      })
+    }
+
+    const scriptLoaded = await loadScript()
+    if (!scriptLoaded) {
+      throw new Error('Failed to load Razorpay payment gateway script. Please check your internet connection.')
+    }
+
     return new Promise((resolve, reject) => {
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || '',

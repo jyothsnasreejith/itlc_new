@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import html2canvas from 'html2canvas'
+
+const STYLES_HTML = {
+  'classic-gold': { border: 'border-[#C5A880]', bg: 'bg-[#FAF8F5]', text: 'text-[#B45309]', primary: 'text-slate-800' },
+  'modern-indigo': { border: 'border-[#4F46E5]', bg: 'bg-[#F8FAFC]', text: 'text-[#4F46E5]', primary: 'text-[#0F172A]' },
+  'emerald-mint': { border: 'border-[#059669]', bg: 'bg-[#F0FDF4]', text: 'text-[#059669]', primary: 'text-[#0F172A]' },
+  'royal-crimson': { border: 'border-[#991B1B]', bg: 'bg-[#FFF5F5]', text: 'text-[#991B1B]', primary: 'text-[#0F172A]' }
+}
 
 export default function EventSelfCheckIn() {
   const { eventId } = useParams()
@@ -15,8 +23,28 @@ export default function EventSelfCheckIn() {
   const [loading, setLoading] = useState(false)
   const [giftClaimedInput, setGiftClaimedInput] = useState('no')
 
+  // Certificate States
+  const [certTemplate, setCertTemplate] = useState(null)
+  const [showCertModal, setShowCertModal] = useState(false)
+  const [customLogo, setCustomLogo] = useState('')
+  const [generatingCert, setGeneratingCert] = useState(false)
+
   useEffect(() => {
     fetchEvent()
+    fetchCertTemplate()
+    // Load custom logo
+    const savedLogo = localStorage.getItem('customLogo')
+    if (savedLogo) {
+      setCustomLogo(savedLogo)
+    } else {
+      supabase.from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'custom_logo')
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.setting_value) setCustomLogo(data.setting_value)
+        })
+    }
   }, [eventId])
 
   async function fetchEvent() {
@@ -33,6 +61,21 @@ export default function EventSelfCheckIn() {
       console.error('Error fetching event:', err)
     } finally {
       setLoadingEvent(false)
+    }
+  }
+
+  async function fetchCertTemplate() {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'cert_template_global')
+        .maybeSingle()
+      if (data?.setting_value) {
+        setCertTemplate(JSON.parse(data.setting_value))
+      }
+    } catch (err) {
+      console.error('Error fetching certificate template:', err)
     }
   }
 
@@ -243,6 +286,165 @@ export default function EventSelfCheckIn() {
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
+  // Certificate dynamic rendering data builder
+  const getCertDetails = () => {
+    const defaultTemplate = {
+      title: 'Certificate of Participation',
+      headerText: 'IT Leaders Community Kerala',
+      subTitle: 'This is proudly presented to',
+      bodyText: 'This is proudly presented to {{name}} in recognition of their active participation in the event {{event_title}} held on {{date}} at {{location}}.',
+      signatoryName: 'ITLC President',
+      signatoryDesignation: 'IT Leaders Community',
+      bgStyle: 'classic-gold',
+      logos: []
+    }
+
+    const t = certTemplate || defaultTemplate
+    const eventTitle = event ? event.title : 'ITLC Event'
+    const eventDate = event ? event.date : ''
+    const eventLoc = event ? event.location : ''
+
+    const attendeeName = result?.name || 'Attendee'
+    let body = t.bodyText || ''
+    body = body.replace(/\{\{\s*name\s*\}\}/gi, attendeeName)
+    body = body.replace(/\btest\b/gi, attendeeName)
+    body = body.replace(/\{\{\s*event_title\s*\}\}/gi, eventTitle)
+    body = body.replace(/\{\{\s*date\s*\}\}/gi, eventDate)
+    body = body.replace(/\{\{\s*location\s*\}\}/gi, eventLoc || 'N/A')
+
+    return {
+      title: t.title,
+      headerText: t.headerText || 'IT Leaders Community Kerala',
+      subTitle: t.subTitle || 'This is proudly presented to',
+      body,
+      signatoryName: t.signatoryName,
+      signatoryDesignation: t.signatoryDesignation,
+      bgStyle: t.bgStyle
+    }
+  }
+
+  // Download high-resolution canvas certificate
+  const downloadCertificate = async () => {
+    try {
+      setGeneratingCert(true)
+      const element = document.getElementById('certificate-render-card')
+      if (!element) {
+        throw new Error('Certificate preview element not found')
+      }
+
+      // Render the DOM element to a canvas
+      const canvas = await html2canvas(element, {
+        scale: 3, // scale by 3 for high-res output
+        useCORS: true,
+        backgroundColor: null,
+        logging: false
+      })
+
+      // Trigger download
+      const link = document.createElement('a')
+      link.download = `Certificate-${(event ? event.title : 'Event').replace(/\s+/g, '_')}-${(result?.name || 'User').replace(/\s+/g, '_')}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } catch (err) {
+      console.error('Error generating certificate image:', err)
+      alert('Failed to generate certificate image: ' + err.message)
+    } finally {
+      setGeneratingCert(false)
+    }
+  }
+
+  const [sharingOnLinkedIn, setSharingOnLinkedIn] = useState(false)
+
+  // Direct share logic to LinkedIn via OAuth and UGC API
+  const executeLinkedInShare = async (token, urn) => {
+    try {
+      setSharingOnLinkedIn(true)
+      const element = document.getElementById('certificate-render-card')
+      if (!element) {
+        throw new Error('Certificate preview element not found')
+      }
+
+      // Render the DOM element to a canvas
+      const canvas = await html2canvas(element, {
+        scale: 2, // scale by 2 for quick feed image upload
+        useCORS: true,
+        backgroundColor: null,
+        logging: false
+      })
+      const base64Image = canvas.toDataURL('image/png')
+
+      const eventTitle = event ? event.title : 'ITLC Event'
+      const postText = `I am proud to share that I have participated in "${eventTitle}" organized by IT Leaders Community Kerala! 🎓\n\nCertificate Code: CERT-${eventId.substring(0, 8)}-${(result?.name || 'CERT').replace(/\s+/g, '-').toUpperCase()}\n\n#ITLC #ITLeadersCommunity #Kerala #ProfessionalGrowth`
+
+      const baseUrl = window.location.origin === 'http://localhost:3000' || window.location.origin === 'http://localhost:5173'
+        ? 'http://localhost:5000'
+        : window.location.origin
+
+      const shareResponse = await fetch(`${baseUrl}/api/linkedin/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          token,
+          urn,
+          text: postText,
+          image: base64Image
+        })
+      })
+
+      if (!shareResponse.ok) {
+        const errJson = await shareResponse.json()
+        throw new Error(errJson.error || 'Failed to post on LinkedIn')
+      }
+
+      alert('Certificate shared successfully to your LinkedIn feed!')
+    } catch (err) {
+      console.error('LinkedIn Share Error:', err)
+      alert('Failed to share to LinkedIn: ' + err.message + '\nTry re-authenticating.')
+      // Clear token to force login next time
+      localStorage.removeItem('linkedInToken')
+      localStorage.removeItem('linkedInUrn')
+      localStorage.removeItem('linkedInName')
+    } finally {
+      setSharingOnLinkedIn(false)
+    }
+  }
+
+  // Share to LinkedIn with default message copied to clipboard
+  const shareToLinkedIn = () => {
+    const token = localStorage.getItem('linkedInToken')
+    const urn = localStorage.getItem('linkedInUrn')
+
+    if (token && urn) {
+      executeLinkedInShare(token, urn)
+    } else {
+      // Trigger OAuth login flow
+      const width = 500
+      const height = 600
+      const left = window.screen.width / 2 - width / 2
+      const top = window.screen.height / 2 - height / 2
+
+      const baseUrl = window.location.origin === 'http://localhost:3000' || window.location.origin === 'http://localhost:5173'
+        ? 'http://localhost:5000'
+        : window.location.origin
+
+      window.open(`${baseUrl}/api/linkedin/login`, 'LinkedInLogin', `width=${width},height=${height},top=${top},left=${left}`)
+
+      const messageListener = async (evt) => {
+        if (evt.data?.type === 'LINKEDIN_LOGIN_SUCCESS') {
+          const { token: newToken, urn: newUrn, name: newName } = evt.data.payload
+          localStorage.setItem('linkedInToken', newToken)
+          localStorage.setItem('linkedInUrn', newUrn)
+          localStorage.setItem('linkedInName', newName)
+          window.removeEventListener('message', messageListener)
+          await executeLinkedInShare(newToken, newUrn)
+        }
+      }
+      window.addEventListener('message', messageListener)
+    }
+  }
+
   if (loadingEvent) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -250,6 +452,8 @@ export default function EventSelfCheckIn() {
       </div>
     )
   }
+
+  const activeCertPreset = certTemplate ? (STYLES_HTML[certTemplate.bgStyle] || STYLES_HTML['classic-gold']) : STYLES_HTML['classic-gold']
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
@@ -405,6 +609,22 @@ export default function EventSelfCheckIn() {
                   Gift Claimed: {result?.giftClaimed === 'yes' ? 'Yes' : 'No'}
                 </p>
               )}
+
+              {/* Certificate Download Panel */}
+              <div className="mt-6 p-4 rounded-xl border border-amber-200 bg-amber-500/5 dark:bg-amber-500/10 dark:border-amber-900/40 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 mb-3">
+                  <span className="material-symbols-outlined text-2xl">workspace_premium</span>
+                </div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Participation Certificate</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Your official ITLC participation certificate is ready for download.</p>
+                <button
+                  onClick={() => setShowCertModal(true)}
+                  className="w-full bg-amber-500 hover:bg-amber-600 active:scale-[0.98] transition-all text-white font-bold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-md">download</span>
+                  View & Download
+                </button>
+              </div>
             </div>
           )}
 
@@ -422,6 +642,40 @@ export default function EventSelfCheckIn() {
                   Gift Claimed: {result?.giftClaimed === 'yes' ? 'Yes' : 'No'}
                 </p>
               )}
+
+              {/* Certificate Download Panel */}
+              <div className="mt-6 p-4 rounded-xl border border-amber-200 bg-amber-500/5 dark:bg-amber-500/10 dark:border-amber-900/40 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 mb-3">
+                  <span className="material-symbols-outlined text-2xl">workspace_premium</span>
+                </div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Participation Certificate</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Your official ITLC participation certificate is ready for download.</p>
+                <div className="flex flex-col sm:flex-row gap-2 w-full mt-1">
+                  <button
+                    onClick={() => setShowCertModal(true)}
+                    className="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] transition-all text-white font-bold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-md">download</span>
+                    View & Download
+                  </button>
+                  <button
+                    onClick={shareToLinkedIn}
+                    disabled={sharingOnLinkedIn}
+                    className="flex-1 bg-[#0a66c2] hover:bg-[#004182] active:scale-[0.98] disabled:opacity-50 transition-all text-white font-bold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    {sharingOnLinkedIn ? (
+                      <span>Sharing...</span>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+                        </svg>
+                        Share
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -444,6 +698,129 @@ export default function EventSelfCheckIn() {
           )}
         </div>
       </div>
+
+      {/* Certificate Viewer Modal */}
+      {showCertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+          <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowCertModal(false)}
+              className="absolute top-4 right-4 size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+
+            <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1">Your E-Certificate</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Verify details and download the image.</p>
+
+            {/* Certificate Styled Frame */}
+            <div className={`w-full aspect-[1.414/1] rounded-lg border-4 ${activeCertPreset.border} ${activeCertPreset.bg} p-4 md:p-6 flex flex-col justify-between relative overflow-hidden select-none border-double`}>
+              {/* Corners */}
+              <div className={`absolute top-1 left-1 w-4 h-4 border-t border-l ${activeCertPreset.border}`}></div>
+              <div className={`absolute top-1 right-1 w-4 h-4 border-t border-r ${activeCertPreset.border}`}></div>
+              <div className={`absolute bottom-1 left-1 w-4 h-4 border-b border-l ${activeCertPreset.border}`}></div>
+              <div className={`absolute bottom-1 right-1 w-4 h-4 border-b border-r ${activeCertPreset.border}`}></div>
+
+              <div className="flex flex-col items-center text-center">
+                <div className="flex items-center justify-center gap-2 mb-1 min-h-[24px]">
+                  {certTemplate?.logos && certTemplate.logos.length > 0 ? (
+                    certTemplate.logos.map((logo, idx) => (
+                      <img key={idx} src={logo} alt={`Logo ${idx+1}`} className="h-6 object-contain" />
+                    ))
+                  ) : (
+                    customLogo ? (
+                      <img src={customLogo} alt="Logo" className="h-6 object-contain" />
+                    ) : (
+                      <div className={`text-md font-bold ${activeCertPreset.text}`}>ITLC</div>
+                    )
+                  )}
+                </div>
+                <h4 className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none select-none">
+                  {getCertDetails().headerText}
+                </h4>
+              </div>
+
+              <div className="text-center flex-1 flex flex-col justify-center my-2">
+                <h2 className={`text-xs md:text-sm font-bold font-serif ${activeCertPreset.text} uppercase tracking-wide`}>
+                  {getCertDetails().title}
+                </h2>
+                <p className="text-[7px] text-slate-400 italic font-serif mt-1 select-none">{getCertDetails().subTitle}</p>
+                <h1 className="text-sm md:text-lg font-bold font-serif text-slate-800 dark:text-slate-200 mt-1 italic leading-none">
+                  {result?.name}
+                </h1>
+                <div 
+                  className={`text-[7px] md:text-[8px] leading-relaxed max-w-xs mx-auto text-slate-500 mt-1 font-sans`}
+                  dangerouslySetInnerHTML={{ __html: getCertDetails().body }}
+                />
+              </div>
+
+              <div className="flex justify-between items-end border-t border-slate-200/50 pt-2 text-left">
+                <div className="flex items-center gap-1.5 leading-none">
+                  <div className={`size-6 rounded-full border border-amber-400 bg-amber-500/10 flex items-center justify-center relative shrink-0`}>
+                    <span className="text-[5px] text-amber-600 font-bold font-serif">ITLC</span>
+                  </div>
+                  <div>
+                    <p className="text-[5px] text-slate-400 uppercase tracking-wider">Verification Code</p>
+                    <p className="text-[6px] text-slate-500 dark:text-slate-300 font-mono font-bold">
+                      {`CERT-${eventId.substring(0, 4)}-${(result?.name || 'CERT').split(' ')[0].toUpperCase()}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-center font-sans max-w-[100px] leading-tight">
+                  <div className="h-4 flex items-end justify-center mb-0.5">
+                    <span className={`font-serif italic text-[8px] ${activeCertPreset.text} opacity-70`}>
+                      {getCertDetails().signatoryName.substring(0, 1) + '. ' + getCertDetails().signatoryName.split(' ').pop()}
+                    </span>
+                  </div>
+                  <div className="w-16 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
+                  <h4 className="text-[7px] font-bold text-slate-700 dark:text-slate-300 mt-0.5 truncate">
+                    {getCertDetails().signatoryName}
+                  </h4>
+                  <p className="text-[5px] text-slate-400 uppercase tracking-wider truncate">
+                    {getCertDetails().signatoryDesignation}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-3 gap-2 mt-5">
+              <button
+                onClick={() => setShowCertModal(false)}
+                className="border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-xl transition-all text-sm"
+              >
+                Close
+              </button>
+              <button
+                onClick={downloadCertificate}
+                disabled={generatingCert}
+                className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all text-sm flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                {generatingCert ? 'Generating...' : 'Download Image'}
+              </button>
+              <button
+                onClick={shareToLinkedIn}
+                disabled={sharingOnLinkedIn}
+                className="bg-[#0a66c2] hover:bg-[#004182] disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all text-sm flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                {sharingOnLinkedIn ? (
+                  <span>Sharing...</span>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+                    </svg>
+                    Share
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

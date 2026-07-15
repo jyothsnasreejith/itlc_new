@@ -105,6 +105,13 @@ export default function Settings() {
           description: 'Manage admin & manager users',
           path: '/admin/users',
           color: 'red'
+        },
+        {
+          icon: 'workspace_premium',
+          label: 'Certificate Templates',
+          description: 'Configure event certificate templates',
+          path: '/admin/certificate-templates',
+          color: 'amber'
         }
       ]
     },

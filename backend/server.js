@@ -745,7 +745,9 @@ app.post('/api/query', async (req, res) => {
       }
 
       // C. Build query for UPDATE
+      // C. Build query for UPDATE
       else if (action === 'update') {
+        const pkColumn = table === 'app_settings' ? 'setting_key' : 'id';
         const updatedData = await processBase64FieldsAsync(data, table);
 
         const updateKeys = Object.keys(updatedData).map(k => `\`${k}\` = ?`).join(', ');
@@ -769,41 +771,42 @@ app.post('/api/query', async (req, res) => {
         }
 
         // Get matching record IDs before update to retrieve them afterward
-        const selectSql = `SELECT id FROM \`${table}\` WHERE ${whereClauses.join(' AND ')}`;
+        const selectSql = `SELECT \`${pkColumn}\` FROM \`${table}\` WHERE ${whereClauses.join(' AND ')}`;
         const [matchingRows] = await connection.query(selectSql, filterParams);
 
         if (matchingRows.length === 0) {
           return res.status(200).json([]);
         }
 
-        const idsToUpdate = matchingRows.map(r => r.id);
+        const idsToUpdate = matchingRows.map(r => r[pkColumn]);
 
-        sql = `UPDATE \`${table}\` SET ${updateKeys} WHERE id IN (${idsToUpdate.map(() => '?').join(', ')})`;
+        sql = `UPDATE \`${table}\` SET ${updateKeys} WHERE \`${pkColumn}\` IN (${idsToUpdate.map(() => '?').join(', ')})`;
         await connection.query(sql, [...updateValues, ...idsToUpdate]);
 
         // Retrieve updated rows
-        const [updatedRows] = await connection.query(`SELECT * FROM \`${table}\` WHERE id IN (${idsToUpdate.map(() => '?').join(', ')})`, idsToUpdate);
+        const [updatedRows] = await connection.query(`SELECT * FROM \`${table}\` WHERE \`${pkColumn}\` IN (${idsToUpdate.map(() => '?').join(', ')})`, idsToUpdate);
         return res.status(200).json(updatedRows);
       }
 
       // D. Build query for UPSERT
       else if (action === 'upsert') {
+        const pkColumn = table === 'app_settings' ? 'setting_key' : 'id';
         const upsertRows = Array.isArray(data) ? data : [data];
         const upsertedResults = [];
 
         for (const rawRow of upsertRows) {
           let row = { ...rawRow };
-          if (!row.id) {
+          if (pkColumn === 'id' && !row.id) {
             row.id = uuidv4();
           }
-          row = await processBase64FieldsAsync(row, row.id);
+          row = await processBase64FieldsAsync(row, row.id || row.setting_key);
 
           const columns = Object.keys(row).map(c => `\`${c}\``).join(', ');
           const placeholders = Object.keys(row).map(() => '?').join(', ');
           const values = Object.values(row);
 
           const updateClauses = Object.keys(row)
-            .filter(k => k !== 'id')
+            .filter(k => k !== pkColumn)
             .map(k => `\`${k}\` = VALUES(\`${k}\`)`)
             .join(', ');
 
@@ -815,7 +818,7 @@ app.post('/api/query', async (req, res) => {
           await connection.query(sql, [...values]);
 
           // Retrieve updated/inserted row
-          const [resultRow] = await connection.query(`SELECT * FROM \`${table}\` WHERE id = ? LIMIT 1`, [row.id]);
+          const [resultRow] = await connection.query(`SELECT * FROM \`${table}\` WHERE \`${pkColumn}\` = ? LIMIT 1`, [row[pkColumn]]);
           if (resultRow.length > 0) {
             upsertedResults.push(resultRow[0]);
           }
@@ -860,6 +863,196 @@ app.post('/api/query', async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+// --- LinkedIn Auth & Sharing Routes ---
+
+app.get('/api/linkedin/login', (req, res) => {
+  const clientId = process.env.LINKEDIN_CLIENT_ID || '';
+  const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+  const redirectUri = `${appUrl}/api/linkedin/callback`;
+  const state = uuidv4();
+  const scope = 'openid profile w_member_social';
+  const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
+  res.redirect(authUrl);
+});
+
+app.get('/api/linkedin/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.status(400).send('Missing authorization code');
+    }
+
+    const clientId = process.env.LINKEDIN_CLIENT_ID || '';
+    const clientSecret = process.env.LINKEDIN_CLIENT_SECRET || '';
+    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+    const redirectUri = `${appUrl}/api/linkedin/callback`;
+
+    // 1. Exchange authorization code for access token
+    const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error(`LinkedIn token exchange failed: ${await tokenResponse.text()}`);
+    }
+
+    const tokenData = await tokenResponse.json();
+
+    // 2. Fetch profile userinfo (openid/profile scope) to get member URN and profile info
+    const userResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`LinkedIn userinfo failed: ${await userResponse.text()}`);
+    }
+
+    const userData = await userResponse.json();
+    const urn = `urn:li:person:${userData.sub}`;
+    const name = userData.name || `${userData.given_name || ''} ${userData.family_name || ''}`.trim() || 'LinkedIn User';
+
+    // 3. Render HTML that posts success message to parent window and closes itself
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><title>LinkedIn Authentication Success</title></head>
+      <body>
+        <p>Authentication successful! Closing window...</p>
+        <script>
+          window.opener.postMessage({
+            type: 'LINKEDIN_LOGIN_SUCCESS',
+            payload: {
+              token: ${JSON.stringify(tokenData.access_token)},
+              urn: ${JSON.stringify(urn)},
+              name: ${JSON.stringify(name)}
+            }
+          }, '*');
+          window.close();
+        </script>
+      </body>
+      </html>
+    `;
+    res.send(html);
+  } catch (err) {
+    console.error('LinkedIn Callback Error:', err.message);
+    res.status(500).send(`Authentication failed: ${err.message}`);
+  }
+});
+
+app.post('/api/linkedin/share', async (req, res) => {
+  try {
+    const { token, urn, text, image } = req.body;
+    if (!token || !urn || !image) {
+      return res.status(400).json({ error: 'Missing required parameters: token, urn, or image' });
+    }
+
+    // 1. Convert base64 image data to binary buffer
+    const cleanStr = image.trim();
+    if (!cleanStr.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image format, must be base64 data URL' });
+    }
+
+    const semiColonIndex = cleanStr.indexOf(';base64,');
+    if (semiColonIndex === -1) {
+      return res.status(400).json({ error: 'Invalid base64 payload' });
+    }
+    const base64Data = cleanStr.substring(semiColonIndex + 8).replace(/\s/g, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // 2. Register upload on LinkedIn
+    const registerResponse = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+          owner: urn,
+          relationshipType: 'OWNER'
+        }
+      })
+    });
+
+    if (!registerResponse.ok) {
+      throw new Error(`LinkedIn registerUpload failed: ${await registerResponse.text()}`);
+    }
+
+    const registerData = await registerResponse.json();
+    const uploadUrl = registerData.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+    const assetUrn = registerData.value.asset;
+
+    // 3. Upload image binary
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: imageBuffer
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`LinkedIn image binary upload failed: ${await uploadResponse.text()}`);
+    }
+
+    // 4. Create feed share post
+    const postResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        author: urn,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: {
+              text: text || 'I am proud to participate in this event!'
+            },
+            shareMediaCategory: 'IMAGE',
+            media: [
+              {
+                status: 'READY',
+                description: {
+                  text: 'ITLC Certificate'
+                },
+                media: assetUrn,
+                title: {
+                  text: 'Certificate of Participation'
+                }
+              }
+            ]
+          }
+        },
+        visibility: {
+          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+        }
+      })
+    });
+
+    if (!postResponse.ok) {
+      throw new Error(`LinkedIn post share failed: ${await postResponse.text()}`);
+    }
+
+    const postData = await postResponse.json();
+    return res.status(200).json({ success: true, post: postData });
+  } catch (err) {
+    console.error('LinkedIn Share Error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Fallback error handler
 app.use((err, req, res, next) => {
