@@ -868,6 +868,29 @@ app.post('/api/query', async (req, res) => {
 
 app.get('/api/linkedin/login', (req, res) => {
   const clientId = process.env.LINKEDIN_CLIENT_ID || '';
+  if (!clientId) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Configuration Required</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 50px; background: #f8fafc; color: #334155; }
+          .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #e2e8f0; }
+          h1 { color: #0a66c2; font-size: 22px; margin-bottom: 12px; }
+          p { font-size: 14px; line-height: 1.6; color: #64748b; margin-bottom: 0; }
+          code { background: #f1f5f9; padding: 3px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; color: #0f172a; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>LinkedIn Configuration Required</h1>
+          <p>Please define your <code>LINKEDIN_CLIENT_ID</code> and <code>LINKEDIN_CLIENT_SECRET</code> variables in the backend <code>.env</code> file, then restart your server to enable sharing.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
   const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
   const redirectUri = `${appUrl}/api/linkedin/callback`;
   const state = uuidv4();
