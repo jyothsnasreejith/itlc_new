@@ -3,6 +3,10 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import html2canvas from 'html2canvas'
 
+const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
+  ? import.meta.env.VITE_API_URL.replace(/\/api$/, '')
+  : 'http://localhost:5000'
+
 const STYLES_HTML = {
   'classic-gold': { border: 'border-[#C5A880]', bg: 'bg-[#FAF8F5]', text: 'text-[#B45309]', primary: 'text-slate-800' },
   'modern-indigo': { border: 'border-[#4F46E5]', bg: 'bg-[#F8FAFC]', text: 'text-[#4F46E5]', primary: 'text-[#0F172A]' },
@@ -376,11 +380,7 @@ export default function EventSelfCheckIn() {
       const eventTitle = event ? event.title : 'ITLC Event'
       const postText = `I am proud to share that I have participated in "${eventTitle}" organized by IT Leaders Community Kerala! 🎓\n\nCertificate Code: CERT-${eventId.substring(0, 8)}-${(result?.name || 'CERT').replace(/\s+/g, '-').toUpperCase()}\n\n#ITLC #ITLeadersCommunity #Kerala #ProfessionalGrowth`
 
-      const baseUrl = window.location.origin === 'http://localhost:3000' || window.location.origin === 'http://localhost:5173'
-        ? 'http://localhost:5000'
-        : window.location.origin
-
-      const shareResponse = await fetch(`${baseUrl}/api/linkedin/share`, {
+      const shareResponse = await fetch(`${BACKEND_URL}/api/linkedin/share`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -425,11 +425,7 @@ export default function EventSelfCheckIn() {
       const left = window.screen.width / 2 - width / 2
       const top = window.screen.height / 2 - height / 2
 
-      const baseUrl = window.location.origin === 'http://localhost:3000' || window.location.origin === 'http://localhost:5173'
-        ? 'http://localhost:5000'
-        : window.location.origin
-
-      window.open(`${baseUrl}/api/linkedin/login`, 'LinkedInLogin', `width=${width},height=${height},top=${top},left=${left}`)
+      window.open(`${BACKEND_URL}/api/linkedin/login`, 'LinkedInLogin', `width=${width},height=${height},top=${top},left=${left}`)
 
       const messageListener = async (evt) => {
         if (evt.data?.type === 'LINKEDIN_LOGIN_SUCCESS') {
