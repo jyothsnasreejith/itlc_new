@@ -821,6 +821,90 @@ export default function EventSelfCheckIn() {
           </div>
         </div>
       )}
+
+      {/* Off-screen high-resolution certificate renderer for download/sharing */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: '-9999px',
+          width: '1024px',
+          pointerEvents: 'none'
+        }}
+      >
+        <div
+          id="certificate-render-card"
+          className={`w-[1024px] aspect-[1.414/1] rounded-lg border-4 ${activeCertPreset.border} ${activeCertPreset.bg} p-10 flex flex-col justify-between relative overflow-hidden select-none border-double`}
+        >
+          {/* Corners */}
+          <div className={`absolute top-2 left-2 w-6 h-6 border-t border-l ${activeCertPreset.border}`}></div>
+          <div className={`absolute top-2 right-2 w-6 h-6 border-t border-r ${activeCertPreset.border}`}></div>
+          <div className={`absolute bottom-2 left-2 w-6 h-6 border-b border-l ${activeCertPreset.border}`}></div>
+          <div className={`absolute bottom-2 right-2 w-6 h-6 border-b border-r ${activeCertPreset.border}`}></div>
+
+          <div className="flex flex-col items-center text-center">
+            <div className="flex items-center justify-center gap-3 mb-2 min-h-[40px]">
+              {certTemplate?.logos && certTemplate.logos.length > 0 ? (
+                certTemplate.logos.map((logo, idx) => (
+                  <img key={idx} src={logo} alt={`Logo ${idx+1}`} className="h-10 object-contain" />
+                ))
+              ) : (
+                customLogo ? (
+                  <img src={customLogo} alt="Logo" className="h-10 object-contain" />
+                ) : (
+                  <div className={`text-xl font-bold ${activeCertPreset.text}`}>ITLC</div>
+                )
+              )}
+            </div>
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-widest leading-none select-none">
+              {getCertDetails().headerText}
+            </h4>
+          </div>
+
+          <div className="text-center flex-1 flex flex-col justify-center my-4">
+            <h2 className={`text-2xl font-bold font-serif ${activeCertPreset.text} uppercase tracking-wide`}>
+              {getCertDetails().title}
+            </h2>
+            <p className="text-xs text-slate-400 italic font-serif mt-2 select-none">{getCertDetails().subTitle}</p>
+            <h1 className="text-3xl font-bold font-serif text-slate-800 dark:text-slate-200 mt-2 italic leading-none">
+              {result?.name}
+            </h1>
+            <div
+              className={`text-sm leading-relaxed max-w-xl mx-auto text-slate-500 mt-2 font-sans`}
+              dangerouslySetInnerHTML={{ __html: getCertDetails().body }}
+            />
+          </div>
+
+          <div className="flex justify-between items-end border-t border-slate-200/50 pt-4 text-left">
+            <div className="flex items-center gap-3 leading-none">
+              <div className={`size-10 rounded-full border border-amber-400 bg-amber-500/10 flex items-center justify-center relative shrink-0`}>
+                <span className="text-[8px] text-amber-600 font-bold font-serif">ITLC</span>
+              </div>
+              <div>
+                <p className="text-[8px] text-slate-400 uppercase tracking-wider">Verification Code</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-300 font-mono font-bold">
+                  {`CERT-${eventId.substring(0, 4)}-${(result?.name || 'CERT').split(' ')[0].toUpperCase()}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-center font-sans max-w-[200px] leading-tight">
+              <div className="h-6 flex items-end justify-center mb-1">
+                <span className={`font-serif italic text-sm ${activeCertPreset.text} opacity-70`}>
+                  {getCertDetails().signatoryName.substring(0, 1) + '. ' + getCertDetails().signatoryName.split(' ').pop()}
+                </span>
+              </div>
+              <div className="w-24 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1 truncate">
+                {getCertDetails().signatoryName}
+              </h4>
+              <p className="text-[8px] text-slate-400 uppercase tracking-wider truncate">
+                {getCertDetails().signatoryDesignation}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

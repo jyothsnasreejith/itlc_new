@@ -1001,8 +1001,7 @@ app.post('/api/linkedin/share', async (req, res) => {
       body: JSON.stringify({
         registerUploadRequest: {
           recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
-          owner: urn,
-          relationshipType: 'OWNER'
+          owner: urn
         }
       })
     });
