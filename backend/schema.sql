@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS members (
     salutation VARCHAR(50) NULL,
     full_name VARCHAR(255) NOT NULL,
     phone_number VARCHAR(50) NOT NULL,
+    professional_phone VARCHAR(50) NULL,
+    personal_phone VARCHAR(50) NULL,
     email VARCHAR(255) NOT NULL,
     professional_email VARCHAR(255) NULL,
     personal_email VARCHAR(255) NULL,

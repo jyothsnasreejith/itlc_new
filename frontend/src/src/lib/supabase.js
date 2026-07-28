@@ -121,7 +121,7 @@ class QueryBuilder {
       }
       return onfulfilled({ data: result, error: null });
     } catch (error) {
-      console.error(`Mock Query Error on table ${this.table}:`, error);
+      console.error(`Database Query Error on table ${this.table}:`, error);
       return onfulfilled({ data: null, error });
     }
   }

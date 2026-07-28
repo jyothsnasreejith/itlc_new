@@ -248,11 +248,16 @@ export default function PublicProfileUpdate() {
       }
 
       // Update member profile
+      const proEmail = editedMember.professional_email || editedMember.email
+      const proPhone = editedMember.professional_phone || editedMember.phone_number
       const updateData = {
         full_name: editedMember.full_name,
-        email: editedMember.email,
-        professional_email: editedMember.professional_email || null,
+        email: proEmail,
+        professional_email: proEmail,
         personal_email: editedMember.personal_email || null,
+        phone_number: proPhone,
+        professional_phone: proPhone,
+        personal_phone: editedMember.personal_phone || null,
         designation: editedMember.designation,
         company: editedMember.company,
         location: editedMember.location,
@@ -658,31 +663,18 @@ export default function PublicProfileUpdate() {
                 />
               </div>
 
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={editedMember.email || ''}
-                  onChange={(e) => setEditedMember({ ...editedMember, email: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                  required
-                />
-              </div>
-
               {/* Professional Email */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Professional Email
+                  Professional/Work Email *
                 </label>
                 <input
                   type="email"
-                  value={editedMember.professional_email || ''}
-                  onChange={(e) => setEditedMember({ ...editedMember, professional_email: e.target.value })}
+                  value={editedMember.professional_email || editedMember.email || ''}
+                  onChange={(e) => setEditedMember({ ...editedMember, professional_email: e.target.value, email: e.target.value })}
                   placeholder="work@company.com"
                   className="w-full px-4 py-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                  required
                 />
               </div>
 
@@ -700,20 +692,34 @@ export default function PublicProfileUpdate() {
                 />
               </div>
 
-              {/* Phone (Read-only) */}
+              {/* Professional Phone Number (Primary - Read-only) */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Phone Number
+                  Professional/Work Phone Number
                 </label>
                 <input
                   type="tel"
-                  value={member.phone_number}
+                  value={editedMember.professional_phone || member.phone_number || ''}
                   disabled
                   className="w-full px-4 py-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Phone number cannot be changed
+                  Primary professional phone number cannot be changed
                 </p>
+              </div>
+
+              {/* Personal Phone Number */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Personal Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={editedMember.personal_phone || ''}
+                  onChange={(e) => setEditedMember({ ...editedMember, personal_phone: e.target.value })}
+                  placeholder="e.g. +919876543210"
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                />
               </div>
 
               {/* Designation */}

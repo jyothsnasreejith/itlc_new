@@ -224,7 +224,11 @@ export default function MemberProfileActivityLog() {
         'designation',
         'area_of_expertise',
         'phone_number',
+        'professional_phone',
+        'personal_phone',
         'email',
+        'professional_email',
+        'personal_email',
         'company',
         'location'
       ]
@@ -256,6 +260,9 @@ export default function MemberProfileActivityLog() {
         })
       }
       
+      const proEmail = editedMember.professional_email || editedMember.email
+      const proPhone = editedMember.professional_phone || editedMember.phone_number
+
       // Update member profile
       const { error } = await supabase
         .from('members')
@@ -263,8 +270,12 @@ export default function MemberProfileActivityLog() {
           full_name: editedMember.full_name,
           designation: editedMember.designation,
           area_of_expertise: editedMember.area_of_expertise,
-          phone_number: editedMember.phone_number,
-          email: editedMember.email,
+          phone_number: proPhone,
+          professional_phone: proPhone,
+          personal_phone: editedMember.personal_phone || null,
+          email: proEmail,
+          professional_email: proEmail,
+          personal_email: editedMember.personal_email || null,
           company: editedMember.company,
           location: editedMember.location,
           profile_image: profileImageUrl,
@@ -600,33 +611,40 @@ export default function MemberProfileActivityLog() {
                     />
                   </div>
                   <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <label className="text-slate-500 text-sm mb-1">Phone Number *</label>
+                    <label className="text-slate-500 text-sm mb-1">Professional/Work Phone *</label>
                     <input
                       type="tel"
-                      value={editedMember?.phone_number || ''}
-                      onChange={(e) => handleInputChange('phone_number', e.target.value)}
+                      value={editedMember?.professional_phone || editedMember?.phone_number || ''}
+                      onChange={(e) => {
+                        handleInputChange('phone_number', e.target.value)
+                        handleInputChange('professional_phone', e.target.value)
+                      }}
                       className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                     />
                   </div>
                   <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <label className="text-slate-500 text-sm mb-1">Email *</label>
+                    <label className="text-slate-500 text-sm mb-1">Personal Phone</label>
                     <input
-                      type="email"
-                      value={editedMember?.email || ''}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      type="tel"
+                      value={editedMember?.personal_phone || ''}
+                      onChange={(e) => handleInputChange('personal_phone', e.target.value)}
                       className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                      required
+                      placeholder="+919876543210"
                     />
                   </div>
                   <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <label className="text-slate-500 text-sm mb-1">Professional Email</label>
+                    <label className="text-slate-500 text-sm mb-1">Professional/Work Email *</label>
                     <input
                       type="email"
-                      value={editedMember?.professional_email || ''}
-                      onChange={(e) => handleInputChange('professional_email', e.target.value)}
+                      value={editedMember?.professional_email || editedMember?.email || ''}
+                      onChange={(e) => {
+                        handleInputChange('email', e.target.value)
+                        handleInputChange('professional_email', e.target.value)
+                      }}
                       className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="work@company.com"
+                      required
                     />
                   </div>
                   <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -665,20 +683,20 @@ export default function MemberProfileActivityLog() {
                     <span className="font-semibold">{member?.company || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <span className="text-slate-500">Email</span>
-                    <span className="font-semibold text-sm">{member?.email || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <span className="text-slate-500">Professional Email</span>
-                    <span className="font-semibold text-sm">{member?.professional_email || 'N/A'}</span>
+                    <span className="text-slate-500">Professional/Work Email</span>
+                    <span className="font-semibold text-sm">{member?.professional_email || member?.email || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
                     <span className="text-slate-500">Personal Email</span>
                     <span className="font-semibold text-sm">{member?.personal_email || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <span className="text-slate-500">Phone</span>
-                    <span className="font-semibold">{member?.phone_number || 'N/A'}</span>
+                    <span className="text-slate-500">Professional/Work Phone</span>
+                    <span className="font-semibold">{member?.professional_phone || member?.phone_number || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <span className="text-slate-500">Personal Phone</span>
+                    <span className="font-semibold">{member?.personal_phone || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
                     <span className="text-slate-500">Location</span>

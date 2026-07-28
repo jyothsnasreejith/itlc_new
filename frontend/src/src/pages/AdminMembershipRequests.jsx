@@ -663,20 +663,44 @@ export default function AdminMembershipRequests() {
                     <span className="material-symbols-outlined text-primary">call</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Phone Number</p>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">{selectedMember.phone_number}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Professional Phone</p>
+                    <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">{selectedMember.professional_phone || selectedMember.phone_number}</p>
                   </div>
                 </div>
 
+                {selectedMember.personal_phone && (
+                  <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                    <div className="size-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-primary">phone_iphone</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Personal Phone</p>
+                      <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">{selectedMember.personal_phone}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                   <div className="size-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary">mail</span>
+                    <span className="material-symbols-outlined text-primary">work</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Email Address</p>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">{selectedMember.email}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Professional/Work Email</p>
+                    <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">{selectedMember.professional_email || selectedMember.email}</p>
                   </div>
                 </div>
+
+                {selectedMember.personal_email && (
+                  <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                    <div className="size-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-primary">mail</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">Personal Email</p>
+                      <p className="text-base font-semibold text-slate-900 dark:text-white mt-1">{selectedMember.personal_email}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                   <div className="size-10 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">

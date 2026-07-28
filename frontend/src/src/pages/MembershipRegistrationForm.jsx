@@ -21,7 +21,8 @@ export default function MembershipRegistrationForm() {
     fullName: '',
     countryCode: '+91',
     phoneNumber: phoneParam ? phoneParam.replace(/\D/g, '').slice(-10) : '',
-    email: '',
+    personalCountryCode: '+91',
+    personalPhoneNumber: '',
     professionalEmail: '',
     personalEmail: '',
     currentDesignation: '',
@@ -109,9 +110,18 @@ export default function MembershipRegistrationForm() {
       return
     }
     if (cleanPhone.length < 8 || cleanPhone.length > 15) {
-      showToast('Enter Valid Phone Number')
+      showToast('Enter Valid Professional Phone Number')
       return
     }
+    if (!formData.professionalEmail) {
+      showToast('Enter Mandatory Professional/Work Email')
+      return
+    }
+
+    const proPhone = `${formData.countryCode}${formData.phoneNumber}`
+    const persPhone = formData.personalPhoneNumber ? `${formData.personalCountryCode}${formData.personalPhoneNumber}` : null
+    const proEmail = formData.professionalEmail
+    const persEmail = formData.personalEmail || null
 
     setLoading(true)
     
@@ -122,10 +132,12 @@ export default function MembershipRegistrationForm() {
           {
             salutation: formData.salutation,
             full_name: formData.fullName,
-            phone_number: `${formData.countryCode}${formData.phoneNumber}`,
-            email: formData.email,
-            professional_email: formData.professionalEmail || null,
-            personal_email: formData.personalEmail || null,
+            phone_number: proPhone,
+            professional_phone: proPhone,
+            personal_phone: persPhone,
+            email: proEmail,
+            professional_email: proEmail,
+            personal_email: persEmail,
             designation: formData.currentDesignation,
             company: formData.currentCompany,
             industry_sector: formData.industrySector,
@@ -306,9 +318,9 @@ export default function MembershipRegistrationForm() {
             </div>
           </div>
 
-          {/* Input: Phone Number */}
+          {/* Input: Professional/Work Phone Number */}
           <div className="flex flex-col gap-2">
-            <label className="text-slate-900 dark:text-slate-100 text-sm font-semibold">Phone Number <span className="text-red-500">*</span></label>
+            <label className="text-slate-900 dark:text-slate-100 text-sm font-semibold">Professional/Work Phone Number <span className="text-red-500">*</span></label>
             <div className="relative flex gap-2">
               <div className="relative flex-shrink-0">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl z-10">
@@ -332,7 +344,6 @@ export default function MembershipRegistrationForm() {
                   <option value="+966">🇸🇦 +966</option>
                   <option value="+60">🇲🇾 +60</option>
                   <option value="+65">🇸🇬 +65</option>
-                  <option value="+971">🇦🇪 +971</option>
                 </select>
               </div>
               <input
@@ -340,7 +351,7 @@ export default function MembershipRegistrationForm() {
                 value={formData.phoneNumber}
                 onChange={handleChange}
                 className="flex-1 px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none"
-                placeholder="9876543210"
+                placeholder="Work phone number"
                 type="tel"
                 pattern="[0-9]+"
                 required
@@ -348,31 +359,52 @@ export default function MembershipRegistrationForm() {
             </div>
           </div>
 
-          {/* Input: Email ID */}
+          {/* Input: Personal Phone Number */}
           <div className="flex flex-col gap-2">
-            <label className="text-slate-900 dark:text-slate-100 text-sm font-semibold">Email Address <span className="text-red-500">*</span></label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
-                mail
-              </span>
+            <label className="text-slate-900 dark:text-slate-100 text-sm font-semibold">Personal Phone Number</label>
+            <div className="relative flex gap-2">
+              <div className="relative flex-shrink-0">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl z-10">
+                  phone_iphone
+                </span>
+                <select
+                  name="personalCountryCode"
+                  value={formData.personalCountryCode}
+                  onChange={handleChange}
+                  className="pl-10 pr-3 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none appearance-none cursor-pointer font-medium"
+                  style={{ minWidth: '110px' }}
+                >
+                  <option value="+91">🇮🇳 +91</option>
+                  <option value="+1">🇺🇸 +1</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+61">🇦🇺 +61</option>
+                  <option value="+971">🇦🇪 +971</option>
+                  <option value="+974">🇶🇦 +974</option>
+                  <option value="+965">🇰🇼 +965</option>
+                  <option value="+968">🇴🇲 +968</option>
+                  <option value="+966">🇸🇦 +966</option>
+                  <option value="+60">🇲🇾 +60</option>
+                  <option value="+65">🇸🇬 +65</option>
+                </select>
+              </div>
               <input
-                name="email"
-                value={formData.email}
+                name="personalPhoneNumber"
+                value={formData.personalPhoneNumber}
                 onChange={handleChange}
-                className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none"
-                placeholder="john@example.com"
-                type="email"
-                required
+                className="flex-1 px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none"
+                placeholder="Personal phone number"
+                type="tel"
+                pattern="[0-9]+"
               />
             </div>
           </div>
 
-          {/* Input: Professional Email */}
+          {/* Input: Professional/Work Email */}
           <div className="flex flex-col gap-2">
-            <label className="text-slate-900 dark:text-slate-100 text-sm font-semibold">Professional Email</label>
+            <label className="text-slate-900 dark:text-slate-100 text-sm font-semibold">Professional/Work Email <span className="text-red-500">*</span></label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
-                work_mail
+                work
               </span>
               <input
                 name="professionalEmail"
@@ -381,6 +413,7 @@ export default function MembershipRegistrationForm() {
                 className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none"
                 placeholder="work@company.com"
                 type="email"
+                required
               />
             </div>
           </div>

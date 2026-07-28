@@ -559,6 +559,40 @@ app.post('/api/query', async (req, res) => {
       let sql = '';
       const params = [];
 
+      // Helper to auto-create missing columns in MySQL or remove invalid keys
+      const ensureColumns = async (dataPayload) => {
+        if (!dataPayload) return dataPayload;
+        const isArray = Array.isArray(dataPayload);
+        const rows = isArray ? dataPayload.map(r => ({ ...r })) : [{ ...dataPayload }];
+        if (rows.length === 0) return dataPayload;
+
+        try {
+          const [colRows] = await connection.query(`SHOW COLUMNS FROM \`${table}\``);
+          const existingColumns = new Set(colRows.map(r => r.Field));
+
+          for (const row of rows) {
+            if (!row || typeof row !== 'object') continue;
+            for (const key of Object.keys(row)) {
+              if (!existingColumns.has(key)) {
+                try {
+                  console.log(`⚡ Auto-adding missing column \`${key}\` to MySQL table \`${table}\`...`);
+                  await connection.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${key}\` LONGTEXT NULL`);
+                  existingColumns.add(key);
+                  console.log(`✅ Column \`${key}\` added successfully to \`${table}\`.`);
+                } catch (alterErr) {
+                  console.warn(`⚠️ Could not add column \`${key}\` to \`${table}\`:`, alterErr.message);
+                  delete row[key];
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Error checking columns for table ${table}:`, err.message);
+        }
+
+        return isArray ? rows : rows[0];
+      };
+
       // A. Build query for SELECT
       if (action === 'select') {
         const selectStr = select || '*';
@@ -577,10 +611,22 @@ app.post('/api/query', async (req, res) => {
           sql = `SELECT * FROM \`${table}\` t`;
         }
 
+        // Fetch existing columns to prevent unknown column filter errors
+        let existingColumns = null;
+        try {
+          const [colRows] = await connection.query(`SHOW COLUMNS FROM \`${table}\``);
+          existingColumns = new Set(colRows.map(r => r.Field));
+        } catch (e) {}
+
         // Apply filters
         const whereClauses = [];
         if (filters && Array.isArray(filters)) {
           for (const filter of filters) {
+            if (existingColumns && filter.column && !existingColumns.has(filter.column)) {
+              console.warn(`⚠️ Skipping filter for non-existent column \`${filter.column}\` in \`${table}\``);
+              continue;
+            }
+
             if (filter.type === 'eq') {
               if (filter.value === null || filter.value === 'null') {
                 whereClauses.push(`t.\`${filter.column}\` IS NULL`);
@@ -622,6 +668,7 @@ app.post('/api/query', async (req, res) => {
                 const match = part.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z]+)\.(.+)$/);
                 if (match) {
                   const [_, col, op, val] = match;
+                  if (existingColumns && !existingColumns.has(col)) continue;
                   if (op === 'eq') {
                     conditions.push(`t.\`${col}\` = ?`);
                     params.push(val);
@@ -645,7 +692,7 @@ app.post('/api/query', async (req, res) => {
         }
 
         // Apply order
-        if (order) {
+        if (order && (!existingColumns || existingColumns.has(order.column))) {
           const { column, ascending } = order;
           sql += ` ORDER BY t.\`${column}\` ${ascending ? 'ASC' : 'DESC'}`;
         }
@@ -717,7 +764,9 @@ app.post('/api/query', async (req, res) => {
 
       // B. Build query for INSERT
       else if (action === 'insert') {
-        const insertRows = Array.isArray(data) ? data : [data];
+        const rawInsertRows = Array.isArray(data) ? data : [data];
+        const sanitizedData = await ensureColumns(rawInsertRows);
+        const insertRows = Array.isArray(sanitizedData) ? sanitizedData : [sanitizedData];
         const insertedResults = [];
 
         for (const rawRow of insertRows) {
@@ -745,13 +794,17 @@ app.post('/api/query', async (req, res) => {
       }
 
       // C. Build query for UPDATE
-      // C. Build query for UPDATE
       else if (action === 'update') {
         const pkColumn = table === 'app_settings' ? 'setting_key' : 'id';
-        const updatedData = await processBase64FieldsAsync(data, table);
+        let updatedData = await processBase64FieldsAsync(data, table);
+        updatedData = await ensureColumns(updatedData);
 
         const updateKeys = Object.keys(updatedData).map(k => `\`${k}\` = ?`).join(', ');
         const updateValues = Object.values(updatedData);
+
+        if (updateKeys.length === 0) {
+          return res.status(200).json([]);
+        }
 
         // Apply filters to find targets
         const whereClauses = [];
@@ -791,7 +844,9 @@ app.post('/api/query', async (req, res) => {
       // D. Build query for UPSERT
       else if (action === 'upsert') {
         const pkColumn = table === 'app_settings' ? 'setting_key' : 'id';
-        const upsertRows = Array.isArray(data) ? data : [data];
+        const rawUpsertRows = Array.isArray(data) ? data : [data];
+        const sanitizedData = await ensureColumns(rawUpsertRows);
+        const upsertRows = Array.isArray(sanitizedData) ? sanitizedData : [sanitizedData];
         const upsertedResults = [];
 
         for (const rawRow of upsertRows) {
@@ -891,8 +946,10 @@ app.get('/api/linkedin/login', (req, res) => {
       </html>
     `);
   }
-  const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-  const redirectUri = `${appUrl}/api/linkedin/callback`;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
+  const redirectUri = `${proto}://${host}/api/linkedin/callback`;
+  console.log('[LinkedIn Login] redirectUri =', redirectUri);
   const state = uuidv4();
   const scope = 'openid profile w_member_social';
   const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(scope)}`;
@@ -908,8 +965,9 @@ app.get('/api/linkedin/callback', async (req, res) => {
 
     const clientId = process.env.LINKEDIN_CLIENT_ID || '';
     const clientSecret = process.env.LINKEDIN_CLIENT_SECRET || '';
-    const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-    const redirectUri = `${appUrl}/api/linkedin/callback`;
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
+    const redirectUri = `${proto}://${host}/api/linkedin/callback`;
 
     // 1. Exchange authorization code for access token
     const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {

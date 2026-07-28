@@ -220,7 +220,7 @@ async function startMigration() {
     // 2. Fetch and migrate tables sequentially to maintain relationships
     const tablesToMigrate = [
       { name: 'app_counters', primaryKey: 'id' },
-      { name: 'members', primaryKey: 'id', selectFields: 'id,salutation,full_name,phone_number,email,professional_email,personal_email,designation,company,industry_sector,industry_type,industry_category,industry_sub_category,country_of_work,location,itlc_chapter_name,years_of_experience,date_of_birth,area_of_expertise,membership_tier,status,login_pin,reset_pin,reset_pin_expires_at,created_at,updated_at' },
+      { name: 'members', primaryKey: 'id', selectFields: 'id,salutation,full_name,phone_number,professional_phone,personal_phone,email,professional_email,personal_email,designation,company,industry_sector,industry_type,industry_category,industry_sub_category,country_of_work,location,itlc_chapter_name,years_of_experience,date_of_birth,area_of_expertise,membership_tier,status,login_pin,reset_pin,reset_pin_expires_at,created_at,updated_at' },
       { name: 'events', primaryKey: 'id', selectFields: 'id,title,description,date,time,location,address,max_registrations,fee,auto_share,status,created_at,updated_at' },
       { name: 'event_counters', primaryKey: 'event_id' },
 
