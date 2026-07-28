@@ -126,53 +126,40 @@ export default function MembershipRegistrationForm() {
     setLoading(true)
     
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .insert([
-          {
-            salutation: formData.salutation,
-            full_name: formData.fullName,
-            phone_number: proPhone,
-            professional_phone: proPhone,
-            personal_phone: persPhone,
-            email: proEmail,
-            professional_email: proEmail,
-            personal_email: persEmail,
-            designation: formData.currentDesignation,
-            company: formData.currentCompany,
-            industry_sector: formData.industrySector,
-            industry_type: formData.industryType,
-            industry_category: formData.industryCategory,
-            industry_sub_category: formData.industrySubCategory,
-            country_of_work: formData.countryOfWork,
-            location: formData.currentWorkLocation,
-            itlc_chapter_name: formData.itlcChapterName,
-            years_of_experience: formData.yearsOfExperience,
-            date_of_birth: formData.dateOfBirth,
-            area_of_expertise: formData.areaOfExpertise,
-            profile_image: formData.profileImage,
-            status: 'pending'
-          }
-        ])
-        .select()
-
-      if (error) throw error
+      const newMember = await memberService.registerMember({
+        salutation: formData.salutation,
+        full_name: formData.fullName,
+        phone_number: proPhone,
+        professional_phone: proPhone,
+        personal_phone: persPhone,
+        email: proEmail,
+        professional_email: proEmail,
+        personal_email: persEmail,
+        designation: formData.currentDesignation,
+        company: formData.currentCompany,
+        industry_sector: formData.industrySector,
+        industry_type: formData.industryType,
+        industry_category: formData.industryCategory,
+        industry_sub_category: formData.industrySubCategory,
+        country_of_work: formData.countryOfWork,
+        location: formData.currentWorkLocation,
+        itlc_chapter_name: formData.itlcChapterName,
+        years_of_experience: formData.yearsOfExperience,
+        date_of_birth: formData.dateOfBirth,
+        area_of_expertise: formData.areaOfExpertise,
+        profile_image: formData.profileImage,
+        status: 'pending'
+      })
       
       // If this was an event registration request, create event registration record
-      if (eventId && data && data.length > 0) {
-        const newMemberId = data[0].id
-        const { error: regError } = await supabase
-          .from('event_registrations')
-          .insert([
-            {
-              event_id: eventId,
-              member_id: newMemberId,
-              status: 'pending',
-              registration_date: new Date().toISOString()
-            }
-          ])
-        
-        if (regError) {
+      if (eventId && newMember && newMember.id) {
+        try {
+          await eventService.registerForEvent({
+            eventId: eventId,
+            memberId: newMember.id,
+            status: 'pending'
+          })
+        } catch (regError) {
           console.error('Error creating event registration:', regError)
           // Don't throw - member was created successfully
         }
