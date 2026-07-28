@@ -30,8 +30,8 @@ export default function EventsList() {
   useEffect(() => {
     // reset paging when tab changes
     setPage(0)
-    setEvents([])
     setHasMore(false)
+    setLoading(true)
     fetchEvents(0)
     // Check if user is admin
     const user = JSON.parse(localStorage.getItem('user') || 'null')
@@ -456,9 +456,18 @@ export default function EventsList() {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto pb-24 px-4 md:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-slate-500 dark:text-slate-400">Loading events...</div>
+          {loading && events.length === 0 ? (
+            <div className="flex flex-col gap-4 pt-4">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="flex flex-col md:flex-row items-stretch rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 animate-pulse overflow-hidden">
+                  <div className="w-full md:w-72 lg:w-80 shrink-0 aspect-video md:aspect-auto md:min-h-[200px] bg-slate-200 dark:bg-slate-800" />
+                  <div className="flex-1 p-4 md:p-6 space-y-3">
+                    <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
+                    <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
+                    <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded w-full mt-4" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : events.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">

@@ -253,212 +253,213 @@ export default function AdminEventRegistrations() {
   }
 
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark max-w-[430px] mx-auto border-x border-slate-200 dark:border-slate-800">
+    <div className="min-h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-900 pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md p-4 justify-between border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => navigate(-1)}
-            className="flex items-center justify-center size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div>
-            <h2 className="text-lg font-bold leading-tight tracking-tight">Event Details & Registrations</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{event?.title || 'Event'}</p>
+      <header className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate(-1)}
+              className="flex items-center justify-center size-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold leading-tight tracking-tight text-slate-900 dark:text-white">Event Details & Registrations</h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{event?.title || 'Event'}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => navigate(`/admin/event-attendance/${id}`)}
-            title="Delegates Attendance"
-            className="flex size-10 items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-          >
-            <span className="material-symbols-outlined">list_alt</span>
-          </button>
-          <button
-            onClick={() => navigate(`/admin/event-checkin-qr/${id}`)}
-            title="Check-In QR Code"
-            className="flex size-10 items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800"
-          >
-            <span className="material-symbols-outlined">qr_code_2</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate(`/admin/event-attendance/${id}`)}
+              title="Delegates Attendance"
+              className="flex size-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              <span className="material-symbols-outlined">list_alt</span>
+            </button>
+            <button
+              onClick={() => navigate(`/admin/event-checkin-qr/${id}`)}
+              title="Check-In QR Code"
+              className="flex size-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              <span className="material-symbols-outlined">qr_code_2</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Scrollable Content Container */}
-      <div className="flex-1 overflow-y-auto pb-24">
-        {/* Event Hero Image */}
-        {event && (
-          <div className="@container">
-            <div className="px-0">
-              <div 
-                className="w-full bg-center bg-no-repeat bg-cover flex flex-col justify-end aspect-video bg-slate-200 dark:bg-slate-800"
-                style={{ backgroundImage: `url("${event.image || DEFAULT_EVENT_IMAGE}")` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Event Info Details */}
-        {event && (
-          <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-            <h1 className="text-xl font-extrabold text-slate-900 dark:text-white leading-tight mb-3">
-              {event.title}
-            </h1>
-            <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 dark:text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-sm">calendar_today</span>
-                <span>{event.date} • {event.time || 'Time TBD'}</span>
+      {/* Main Container */}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* Left Column (Event Info, Stats & Winners) */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+            {/* Event Hero Card */}
+            {event && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div 
+                  className="w-full bg-center bg-no-repeat bg-cover aspect-video bg-slate-200 dark:bg-slate-800"
+                  style={{ backgroundImage: `url("${event.image || DEFAULT_EVENT_IMAGE}")` }}
+                />
+                <div className="p-5">
+                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white leading-tight mb-3">
+                    {event.title}
+                  </h1>
+                  <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-sm">calendar_today</span>
+                      <span>{event.date} • {event.time || 'Time TBD'}</span>
+                    </div>
+                    {event.location && (
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-sm">location_on</span>
+                        <span>{event.location} {event.address && `(${event.address})`}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                    {event.description}
+                  </p>
+                </div>
               </div>
-              {event.location && (
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-sm">location_on</span>
-                  <span>{event.location} {event.address && `(${event.address})`}</span>
+            )}
+
+            {/* Stats Overview */}
+            <section className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Registration Stats</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3">
+                <div className="bg-primary/10 dark:bg-primary/20 p-3 rounded-xl border border-primary/20">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-primary">Pending</p>
+                  <p className="text-xl font-bold">{stats.pending}</p>
+                </div>
+                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Approved</p>
+                  <p className="text-xl font-bold">{stats.approved}</p>
+                </div>
+                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Total</p>
+                  <p className="text-xl font-bold">{stats.total}</p>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-blue-650">Non-Mbr</p>
+                  <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{stats.nonMembers || 0}</p>
+                </div>
+              </div>
+              {event?.fee > 0 && (
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-450 text-lg">account_balance_wallet</span>
+                    <div>
+                      <p className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 dark:text-emerald-450">Total Collected</p>
+                      <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">₹{Number(stats.totalCollected).toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs text-emerald-600 dark:text-emerald-450">
+                    <p>Fee: ₹{Number(event?.fee).toLocaleString('en-IN')}</p>
+                    <p>{stats.totalCollected > 0 ? Math.round(stats.totalCollected / event?.fee) : 0} paid</p>
+                  </div>
                 </div>
               )}
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-              {event.description}
-            </p>
-          </div>
-        )}
+            </section>
 
-        {/* Stats Overview */}
-        <section className="p-4 flex flex-col gap-3">
-          <div className="grid grid-cols-4 gap-3">
-            <div className="bg-primary/10 dark:bg-primary/20 p-3 rounded-xl border border-primary/20">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-primary">Pending</p>
-              <p className="text-xl font-bold">{stats.pending}</p>
-            </div>
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Approved</p>
-              <p className="text-xl font-bold">{stats.approved}</p>
-            </div>
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Total</p>
-              <p className="text-xl font-bold">{stats.total}</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-200 dark:border-blue-800">
-              <p className="text-[10px] uppercase font-bold tracking-wider text-blue-650">Non-Mbr</p>
-              <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{stats.nonMembers || 0}</p>
-            </div>
+            {/* Lucky Draw Winners Section */}
+            {event && (
+              <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-amber-500 text-xl animate-bounce">military_tech</span>
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">Lucky Draw Winners</h2>
+                  </div>
+                  <button
+                    onClick={() => navigate('/admin/spin-wheel')}
+                    className="text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-bold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-xs">casino</span>
+                    Draw Arena
+                  </button>
+                </div>
+                
+                {presentAttendees.filter(p => p.luckyDrawWinner).length === 0 ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                    No winners have been selected for this event yet.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {presentAttendees
+                      .filter(p => p.luckyDrawWinner)
+                      .map(winner => (
+                        <div key={winner.id} className="bg-white dark:bg-slate-800 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3 shadow-xs">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-amber-500/10 border border-amber-500/20 flex-shrink-0 flex items-center justify-center">
+                            {winner.profile_image ? (
+                              <img src={winner.profile_image} alt={winner.full_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-amber-600 text-lg">person</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{winner.full_name}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{winner.designation || 'Attendee'}</p>
+                          </div>
+                          <span className="material-symbols-outlined text-amber-500 text-xl">workspace_premium</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          {event?.fee > 0 && (
-            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-450 text-lg">account_balance_wallet</span>
-                <div>
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 dark:text-emerald-450">Total Collected</p>
-                  <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">₹{Number(stats.totalCollected).toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-              <div className="text-right text-xs text-emerald-600 dark:text-emerald-450">
-                <p>Fee: ₹{Number(event?.fee).toLocaleString('en-IN')}</p>
-                <p>{stats.totalCollected > 0 ? Math.round(stats.totalCollected / event?.fee) : 0} paid</p>
-              </div>
-            </div>
-          )}
-        </section>
 
-        {/* Lucky Draw Winners Section */}
-        {event && (
-          <div className="px-4 mb-4">
-            <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-amber-500 text-xl animate-bounce">military_tech</span>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Lucky Draw Winners</h2>
-                </div>
+          {/* Right Column (Filters & Registration Requests List) */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-3">Reviewing Interests</h3>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
-                  onClick={() => navigate('/admin/spin-wheel')}
-                  className="text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-bold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                  onClick={() => setFilter('all')}
+                  className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-colors ${
+                    filter === 'all'
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-xs">casino</span>
-                  Draw Arena
+                  All Requests
+                </button>
+                <button
+                  onClick={() => setFilter('pending')}
+                  className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-colors ${
+                    filter === 'pending'
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Pending
+                </button>
+                <button
+                  onClick={() => setFilter('approved')}
+                  className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-colors ${
+                    filter === 'approved'
+                      ? 'bg-primary text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Reviewed
                 </button>
               </div>
-              
-              {presentAttendees.filter(p => p.luckyDrawWinner).length === 0 ? (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                  No winners have been selected for this event yet.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {presentAttendees
-                    .filter(p => p.luckyDrawWinner)
-                    .map(winner => (
-                      <div key={winner.id} className="bg-white dark:bg-slate-800 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3 shadow-xs">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-amber-500/10 border border-amber-500/20 flex-shrink-0 flex items-center justify-center">
-                          {winner.profile_image ? (
-                            <img src={winner.profile_image} alt={winner.full_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="material-symbols-outlined text-amber-600 text-lg">person</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{winner.full_name}</p>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{winner.designation || 'Attendee'}</p>
-                        </div>
-                        <span className="material-symbols-outlined text-amber-500 text-xl">workspace_premium</span>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Filters Section (Reviewing Interests) */}
-        <div className="px-4 py-2">
-          <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-3">Reviewing Interests</h3>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-            <button
-              onClick={() => setFilter('all')}
-              className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium ${
-                filter === 'all'
-                  ? 'bg-primary text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              All Requests
-            </button>
-            <button
-              onClick={() => setFilter('pending')}
-              className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium ${
-                filter === 'pending'
-                  ? 'bg-primary text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              Pending
-            </button>
-            <button
-              onClick={() => setFilter('approved')}
-              className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium ${
-                filter === 'approved'
-                  ? 'bg-primary text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              Reviewed
-            </button>
-          </div>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mt-2">
-            {[['all', 'All Types'], ['member', 'Members'], ['non_member', 'Non-Members']].map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setTypeFilter(val)}
-                className={`flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-4 text-xs font-medium ${
-                  typeFilter === val
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mt-2">
+                {[['all', 'All Types'], ['member', 'Members'], ['non_member', 'Non-Members']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setTypeFilter(val)}
+                    className={`flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-4 text-xs font-medium ${
+                      typeFilter === val
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
         </div>
 
         {/* Registration List */}
@@ -651,6 +652,8 @@ export default function AdminEventRegistrations() {
           )}
         </div>
       </div>
+    </div>
+  </div>
 
       {/* Floating Action Button - Create Event */}
       <button
