@@ -477,13 +477,13 @@ export default function EventsList() {
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className={`flex flex-col items-stretch justify-start rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-100 dark:border-slate-800 ${
+                  className={`flex flex-col md:flex-row items-stretch justify-start rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow ${
                     activeTab === 'expired' ? 'opacity-60 grayscale-[0.5]' : ''
                   }`}
                 >
                   {/* Event Image */}
                   <div 
-                    className="relative w-full aspect-video bg-center bg-no-repeat bg-cover cursor-pointer bg-slate-200 dark:bg-slate-800 overflow-hidden rounded-t-xl"
+                    className="relative w-full md:w-72 lg:w-80 shrink-0 aspect-video md:aspect-auto md:min-h-[220px] bg-center bg-no-repeat bg-cover cursor-pointer bg-slate-200 dark:bg-slate-800 overflow-hidden rounded-t-xl md:rounded-tr-none md:rounded-l-xl"
                     style={{ backgroundImage: `url('${event.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80'}')` }}
                     onClick={() => handleEventClick(event)}
                   >
@@ -513,7 +513,7 @@ export default function EventsList() {
                   </div>
 
                   {/* Event Details */}
-                  <div className="flex flex-col gap-2 p-4">
+                  <div className="flex flex-col justify-between flex-1 gap-2 p-4 md:p-6">
                     <div className="flex justify-between items-start gap-2">
                       <h3 
                         className="text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight cursor-pointer hover:text-primary transition-colors flex-1"
@@ -693,45 +693,44 @@ export default function EventsList() {
                       </button>
                     </div>
 
+                    {/* Location */}
+                    {event.location && (
+                      <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-xs font-medium mt-2">
+                        <span className="material-symbols-outlined text-sm text-primary">location_on</span>
+                        <span className="truncate">{event.location}</span>
+                      </div>
+                    )}
+
+                    {/* Action Buttons Row */}
                     {activeTab === 'upcoming' && (
-                      <>
-                        <div className="flex items-center gap-4 mt-2">
-                          {/* Location - show for upcoming events */}
-                          {event.location && (
-                            <div className="flex items-center gap-1 text-slate-400 text-xs font-medium">
-                              <span className="material-symbols-outlined text-sm">location_on</span>
-                              <span className="truncate">{event.location}</span>
-                            </div>
-                          )}
-                          
-                          <button
-                            onClick={() => navigate(`/admin/event-registrations/${event.id}`)}
-                            className="flex-1 rounded-lg h-10 font-bold text-sm transition-colors flex items-center justify-center bg-primary hover:bg-primary/90 text-white"
-                          >
-                            View Details
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/admin/event-checkin-qr/${event.id}`)
-                            }}
-                            title="Check-In QR Code"
-                            className="flex-shrink-0 size-10 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-slate-800 hover:bg-primary/20 dark:hover:bg-primary/20 hover:text-primary text-slate-600 dark:text-slate-400 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-xl">qr_code_2</span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/admin/event-attendance/${event.id}`)
-                            }}
-                            title="Attendance"
-                            className="flex-shrink-0 size-10 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-slate-800 hover:bg-primary/20 dark:hover:bg-primary/20 hover:text-primary text-slate-600 dark:text-slate-400 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-xl">how_to_reg</span>
-                          </button>
-                        </div>
-                      </>
+                      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                        <button
+                          onClick={() => navigate(`/admin/event-registrations/${event.id}`)}
+                          className="flex-1 min-w-0 px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center bg-primary hover:bg-primary/90 text-white shadow-sm active:scale-[0.98] whitespace-nowrap"
+                        >
+                          View Details
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/admin/event-checkin-qr/${event.id}`)
+                          }}
+                          title="Check-In QR Code"
+                          className="shrink-0 size-10 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 text-slate-700 dark:text-slate-300 hover:text-primary transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-xl">qr_code_2</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/admin/event-attendance/${event.id}`)
+                          }}
+                          title="Attendance"
+                          className="shrink-0 size-10 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 text-slate-700 dark:text-slate-300 hover:text-primary transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-xl">how_to_reg</span>
+                        </button>
+                      </div>
                     )}
 
                     {activeTab === 'expired' && (

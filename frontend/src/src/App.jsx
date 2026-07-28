@@ -26,6 +26,16 @@ import SubmissionThanks from './pages/SubmissionThanks'
 import AdminSpinWheel from './pages/AdminSpinWheel'
 import AdminSpinWheelFullscreen from './pages/AdminSpinWheelFullscreen'
 
+function RootRedirect() {
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />
+  } else if (user?.role === 'event_manager') {
+    return <Navigate to="/manager/dashboard" replace />
+  }
+  return <Login />
+}
+
 function AdminProtectedRoute({ children }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
   const isAdmin = user?.role === 'admin'
@@ -40,8 +50,8 @@ function AdminProtectedRoute({ children }) {
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="/login" element={<RootRedirect />} />
 
       {/* Public event registration/invite flow routes */}
       <Route path="/event/:id" element={<EventDetailsRegistration />} />

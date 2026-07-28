@@ -4,13 +4,16 @@ export default function BottomNav() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  const dashboardPath = user?.role === 'event_manager' ? '/manager/dashboard' : '/admin/dashboard'
+
   const navItems = [
     {
-      path: '/',
+      path: dashboardPath,
       icon: 'dashboard',
       label: 'Dashboard',
       key: 'dashboard',
-      match: (pathname) => pathname === '/'
+      match: (pathname) => pathname.includes('/dashboard') || pathname === '/'
     },
     {
       path: '/events',
