@@ -2,10 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+  touch-action: manipulation;
+}
+
 body {
-  min-height: max(884px, 100dvh);
+  min-height: 100dvh;
   font-family: 'Be Vietnam Pro', sans-serif;
   background-color: #f5f7f8;
+  overflow-x: hidden;
 }
 
 @media (min-width: 768px) {
@@ -15,7 +22,9 @@ body {
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .material-symbols-outlined {

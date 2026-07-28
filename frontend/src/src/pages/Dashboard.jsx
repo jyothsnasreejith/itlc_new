@@ -10,7 +10,7 @@ export default function Dashboard() {
     totalMembers: 0,
     approvedMembers: 0,
     pendingMembers: 0,
-    maxMembers: 500,
+    maxMembers: 1000,
     totalEvents: 0,
     upcomingEvents: 0,
     completedEvents: 0,
@@ -59,7 +59,6 @@ export default function Dashboard() {
         expiredEventsResult,
         totalRegistrationsResult,
         totalAttendanceResult,
-        maxMembersSettingResult,
         recentEventsResult,
         recentMembersResult
       ] = await Promise.all([
@@ -71,18 +70,17 @@ export default function Dashboard() {
         supabase.from('events').select('id', { count: 'exact', head: true }).lt('date', currentDate),
         supabase.from('event_registrations').select('id', { count: 'exact', head: true }),
         supabase.from('event_attendance').select('id', { count: 'exact', head: true }),
-        supabase.from('app_settings').select('setting_value').eq('setting_key', 'max_members').single(),
         supabase.from('events').select('id, title, date, time, status').gte('date', currentDate).order('date', { ascending: true }).limit(5),
         supabase.from('members').select('id, full_name, designation, company, profile_image').eq('status', 'approved').order('created_at', { ascending: false }).limit(5)
       ])
 
-      const maxMembers = maxMembersSettingResult?.data ? parseInt(maxMembersSettingResult.data.setting_value) : 500
+      const maxMembers = 1000
 
       setStats({
         totalMembers: Number(totalMembersResult?.count || 0),
         approvedMembers: Number(approvedMembersResult?.count || 0),
         pendingMembers: Number(pendingMembersResult?.count || 0),
-        maxMembers,
+        maxMembers: 1000,
         totalEvents: Number(totalEventsResult?.count || 0),
         upcomingEvents: Number(upcomingEventsResult?.count || 0),
         completedEvents: Number(expiredEventsResult?.count || 0),
@@ -115,7 +113,7 @@ export default function Dashboard() {
         totalMembers: 0,
         approvedMembers: 0,
         pendingMembers: 0,
-        maxMembers: 500,
+        maxMembers: 1000,
         totalEvents: 0,
         upcomingEvents: 0,
         completedEvents: 0,
@@ -148,27 +146,27 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-4 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Admin Dashboard</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Welcome back, {user?.name || 'Admin'}</p>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Admin Dashboard</h1>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Welcome back, {user?.name || 'Admin'}</p>
           </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/admin/membership-requests')}
-              className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative"
+              className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative active:scale-95 transition-transform"
             >
-              <span className="material-symbols-outlined text-primary">notifications</span>
+              <span className="material-symbols-outlined text-indigo-600 dark:text-indigo-400">notifications</span>
               {stats.pendingMembers > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow">
                   {stats.pendingMembers}
                 </span>
               )}
             </button>
             <button
               onClick={handleLogout}
-              className="size-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center justify-center transition-colors"
+              className="size-10 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center justify-center transition-colors active:scale-95"
               title="Logout"
             >
               <span className="material-symbols-outlined text-red-600 dark:text-red-400">logout</span>
@@ -177,25 +175,25 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="p-4 space-y-6">
+      <main className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
         {/* Key Metrics Grid */}
         <section>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Overview</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3">Overview</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {/* Total Members */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="size-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-blue-500 text-2xl">group</span>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="size-10 sm:size-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-blue-500 text-xl sm:text-2xl">group</span>
                 </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">{stats.totalMembers}</p>
-                <p className="text-xl font-semibold text-slate-400 dark:text-slate-500">/ {stats.maxMembers}</p>
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{stats.totalMembers}</p>
+                <p className="text-base sm:text-xl font-semibold text-slate-400 dark:text-slate-500">/ {stats.maxMembers}</p>
               </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Total Members</p>
-              <div className="flex gap-2 mt-3">
-                <span className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Total Members</p>
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                <span className="text-[11px] bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded font-medium">
                   {stats.approvedMembers} Approved
                 </span>
                 {stats.pendingMembers > 0 && (
