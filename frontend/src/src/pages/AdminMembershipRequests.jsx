@@ -306,7 +306,6 @@ export default function AdminMembershipRequests() {
                 <p className={`text-3xl font-bold ${
                   activeTab === 'pending' ? 'text-primary' : 'text-slate-900 dark:text-white'
                 }`}>{stats.pending}</p>
-                {stats.pending > 0 && <span className="text-xs text-primary/80 mb-1 font-semibold">+3 today</span>}
               </div>
             </div>
             <div

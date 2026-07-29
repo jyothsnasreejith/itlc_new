@@ -184,52 +184,77 @@ export default function AdminEventRegistrations() {
   const filteredAbsent = filterPeople(absentAttendees)
 
   const handleExportToExcel = () => {
+    if (!registrations || registrations.length === 0) {
+      alert('No registration data available to export for the selected filter.')
+      return
+    }
+
     const headers = [
-      'Name',
-      'Type',
+      'Full Name',
+      'Member Type',
+      'Registration Status',
+      'Designation',
+      'Company / Organization',
       'Email',
-      'Phone',
-      'Status',
-      'Check-In Time',
-      'Check-Out Time',
-      'Gift Claimed',
-      'Lucky Winner'
+      'Phone Number',
+      'ITLC Chapter',
+      'Industry Sector',
+      'Location',
+      'Payment Status',
+      'Payment Amount (INR)',
+      'Payment ID',
+      'Registration Date & Time'
     ]
 
-    const rows = presentAttendees.map(p => [
-      p.full_name,
-      p.isGuest ? 'Guest' : 'Member',
-      p.email || '',
-      p.phone_number || '',
-      p.checkedOutAt || p.checkedOut ? 'Checked Out' : 'Present',
-      p.checkedInAt ? formatTime(p.checkedInAt) : '',
-      p.checkedOutAt ? formatTime(p.checkedOutAt) : '',
-      event?.gift === 'yes' ? (p.giftClaimed === 'yes' ? 'Yes' : 'No') : 'N/A',
-      p.luckyDrawWinner ? 'Yes' : 'No'
-    ]).concat(
-      absentAttendees.map(p => [
-        p.full_name,
-        p.isGuest ? 'Guest' : 'Member',
-        p.email || '',
-        p.phone_number || '',
-        'Absent',
-        '',
-        '',
-        'N/A',
-        'No'
-      ])
-    )
+    const rows = registrations.map((r) => {
+      const isNonMember = !r.member_id
+      const displayName = isNonMember ? r.guest_name : r.member?.full_name
+      const memberType = isNonMember ? 'Non-Member' : 'Member'
+      const status = r.status ? r.status.toUpperCase() : 'PENDING'
+      const designation = isNonMember ? r.guest_designation : r.member?.designation
+      const company = isNonMember ? r.guest_company : r.member?.company
+      const email = isNonMember ? r.guest_email : r.member?.email
+      const phone = isNonMember ? r.guest_phone : r.member?.phone_number
+      const chapter = isNonMember ? 'N/A' : (r.member?.itlc_chapter_name || 'N/A')
+      const industry = isNonMember ? r.guest_industry_sector : r.member?.industry_sector
+      const location = isNonMember ? r.guest_location : (r.member?.itlc_chapter_name ? `${r.member.itlc_chapter_name} Chapter` : 'N/A')
+      const paymentStatus = r.payment_status ? r.payment_status.toUpperCase() : 'UNPAID'
+      const paymentAmount = r.payment_amount || 0
+      const paymentId = r.payment_id || 'N/A'
+      const registeredAt = r.created_at ? new Date(r.created_at).toLocaleString() : 'N/A'
+
+      return [
+        displayName || 'N/A',
+        memberType,
+        status,
+        designation || 'N/A',
+        company || 'N/A',
+        email || 'N/A',
+        phone || 'N/A',
+        chapter,
+        industry || 'N/A',
+        location || 'N/A',
+        paymentStatus,
+        paymentAmount,
+        paymentId,
+        registeredAt
+      ]
+    })
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
-    ].join('\n')
+      ...rows.map(row => row.map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(','))
+    ].join('\r\n')
 
+    // UTF-8 BOM for Microsoft Excel auto-formatting
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
+    const filterLabel = filter === 'all' ? 'all' : filter
+    const eventName = (event?.title || 'event').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()
+    
     link.setAttribute('href', url)
-    link.setAttribute('download', `${(event?.title || 'event').replace(/\s+/g, '-').toLowerCase()}-attendance-report.csv`)
+    link.setAttribute('download', `${eventName}-${filterLabel}-registrations.csv`)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -412,7 +437,17 @@ export default function AdminEventRegistrations() {
           {/* Right Column (Filters & Registration Requests List) */}
           <div className="lg:col-span-7 space-y-4">
             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-3">Reviewing Interests</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400">Reviewing Interests</h3>
+                <button
+                  onClick={handleExportToExcel}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+                  title="Export filtered registrations to Excel"
+                >
+                  <span className="material-symbols-outlined text-base">table_view</span>
+                  <span>Export ({registrations.length}) to Excel</span>
+                </button>
+              </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
                   onClick={() => setFilter('all')}
