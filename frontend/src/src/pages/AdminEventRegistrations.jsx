@@ -11,6 +11,7 @@ export default function AdminEventRegistrations() {
   const [registrations, setRegistrations] = useState([])
   const [filter, setFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [sortOrder, setSortOrder] = useState('newest') // 'newest' | 'oldest'
   const [stats, setStats] = useState({ pending: 0, approved: 0, total: 0, totalCollected: 0 })
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -183,8 +184,14 @@ export default function AdminEventRegistrations() {
   const filteredPresent = filterPeople(presentAttendees)
   const filteredAbsent = filterPeople(absentAttendees)
 
+  const sortedRegistrations = [...registrations].sort((a, b) => {
+    const timeA = new Date(a.created_at || 0).getTime()
+    const timeB = new Date(b.created_at || 0).getTime()
+    return sortOrder === 'newest' ? timeB - timeA : timeA - timeB
+  })
+
   const handleExportToExcel = () => {
-    if (!registrations || registrations.length === 0) {
+    if (!sortedRegistrations || sortedRegistrations.length === 0) {
       alert('No registration data available to export for the selected filter.')
       return
     }
@@ -206,7 +213,7 @@ export default function AdminEventRegistrations() {
       'Registration Date & Time'
     ]
 
-    const rows = registrations.map((r) => {
+    const rows = sortedRegistrations.map((r) => {
       const isNonMember = !r.member_id
       const displayName = isNonMember ? r.guest_name : r.member?.full_name
       const memberType = isNonMember ? 'Non-Member' : 'Member'
@@ -251,10 +258,11 @@ export default function AdminEventRegistrations() {
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     const filterLabel = filter === 'all' ? 'all' : filter
+    const sortLabel = sortOrder === 'newest' ? 'newest-first' : 'oldest-first'
     const eventName = (event?.title || 'event').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()
     
     link.setAttribute('href', url)
-    link.setAttribute('download', `${eventName}-${filterLabel}-registrations.csv`)
+    link.setAttribute('download', `${eventName}-${filterLabel}-${sortLabel}-registrations.csv`)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -480,20 +488,32 @@ export default function AdminEventRegistrations() {
                   Reviewed
                 </button>
               </div>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mt-2">
-                {[['all', 'All Types'], ['member', 'Members'], ['non_member', 'Non-Members']].map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => setTypeFilter(val)}
-                    className={`flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-4 text-xs font-medium ${
-                      typeFilter === val
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-1 mt-2">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                  {[['all', 'All Types'], ['member', 'Members'], ['non_member', 'Non-Members']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setTypeFilter(val)}
+                      className={`flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-4 text-xs font-medium ${
+                        typeFilter === val
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sort Option Toggle Button */}
+                <button
+                  onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+                  className="flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
+                  title="Click to toggle sort order"
+                >
+                  <span className="material-symbols-outlined text-sm text-primary">swap_vert</span>
+                  <span>{sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}</span>
+                </button>
               </div>
         </div>
 
@@ -501,10 +521,10 @@ export default function AdminEventRegistrations() {
         <div className="px-4 py-2">
           {loading ? (
             <div className="text-center py-4 text-xs">Loading registrations...</div>
-          ) : registrations.length === 0 ? (
+          ) : sortedRegistrations.length === 0 ? (
             <div className="text-center py-4 text-xs text-slate-500">No registrations found</div>
           ) : (
-            registrations.map((registration) => {
+            sortedRegistrations.map((registration) => {
               const isNonMember = !registration.member_id
               const displayName = isNonMember ? registration.guest_name : registration.member?.full_name
               const displayDesignation = isNonMember ? registration.guest_designation : registration.member?.designation
