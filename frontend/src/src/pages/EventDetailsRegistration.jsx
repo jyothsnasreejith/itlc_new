@@ -348,6 +348,26 @@ export default function EventDetailsRegistration() {
             </p>
           </div>
 
+          {/* I Am Attending Poster Creator Banner */}
+          <div className="mt-6 bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-purple-900/30 border border-indigo-500/30 p-4 sm:p-5 rounded-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="size-10 sm:size-12 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-2xl">style</span>
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Attending this event?</h4>
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">Create your official "I Am Attending" poster and share it on LinkedIn</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/public/event/${event.id}/poster`)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition-all shrink-0 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
+              <span>Create Poster</span>
+            </button>
+          </div>
+
           {/* Registration Stats Section */}
           {event.id !== 'demo' && (
             <div className="mt-8">
