@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { memberService } from '../services/memberService'
 import BottomNav from '../components/BottomNav'
 import { memberService } from '../services/memberService'
 

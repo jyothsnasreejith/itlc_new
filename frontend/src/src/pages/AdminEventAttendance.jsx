@@ -274,7 +274,7 @@ export default function AdminEventAttendance() {
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">Lucky Draw Winners</h2>
               </div>
               <button
-                onClick={() => navigate('/admin/spin-wheel')}
+                onClick={() => navigate(`/admin/spin-wheel?eventId=${id}`)}
                 className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
               >
                 <span className="material-symbols-outlined text-xs">casino</span>

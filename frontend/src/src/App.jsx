@@ -25,14 +25,19 @@ import AdminUserManagement from './pages/AdminUserManagement'
 import SubmissionThanks from './pages/SubmissionThanks'
 import AdminSpinWheel from './pages/AdminSpinWheel'
 import AdminSpinWheelFullscreen from './pages/AdminSpinWheelFullscreen'
+import EventAttendingPoster from './pages/EventAttendingPoster'
 
 function RootRedirect() {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
-  if (user?.role === 'admin') {
+  const isLoggedIn = !!user
+  
+  if (isLoggedIn) {
+    if (user?.role === 'event_manager') {
+      return <Navigate to="/manager/dashboard" replace />
+    }
     return <Navigate to="/admin/dashboard" replace />
-  } else if (user?.role === 'event_manager') {
-    return <Navigate to="/manager/dashboard" replace />
   }
+  
   return <Login />
 }
 
@@ -53,9 +58,11 @@ function App() {
       <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<RootRedirect />} />
 
-      {/* Public event registration/invite flow routes */}
+      {/* Public event registration/invite flow & poster routes */}
       <Route path="/event/:id" element={<EventDetailsRegistration />} />
       <Route path="/public/event/:id" element={<EventDetailsRegistration />} />
+      <Route path="/event/:id/poster" element={<EventAttendingPoster />} />
+      <Route path="/public/event/:id/poster" element={<EventAttendingPoster />} />
       <Route path="/unified-event-registration/:eventId" element={<UnifiedEventRegistration />} />
       <Route path="/event-registration/:eventId" element={<EventRegistrationConfirmation />} />
       <Route path="/thanks" element={<SubmissionThanks />} />

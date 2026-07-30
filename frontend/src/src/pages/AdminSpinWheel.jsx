@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import BottomNav from '../components/BottomNav'
 
@@ -56,6 +56,9 @@ const playWinSound = () => {
 
 export default function AdminSpinWheel() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const paramEventId = searchParams.get('eventId')
+
   const canvasRef = useRef(null)
   const confettiCanvasRef = useRef(null)
   
@@ -87,7 +90,7 @@ export default function AdminSpinWheel() {
   // Fetch events list on load
   useEffect(() => {
     fetchEvents()
-  }, [])
+  }, [paramEventId])
 
   async function fetchEvents() {
     try {
@@ -97,8 +100,19 @@ export default function AdminSpinWheel() {
         .order('date', { ascending: false })
 
       if (error) throw error
-      setEvents(data || [])
+      const allEvts = data || []
+      setEvents(allEvts)
       
+      // If paramEventId is passed, set date filter to that event's date and select it
+      if (paramEventId) {
+        const found = allEvts.find(e => String(e.id) === String(paramEventId))
+        if (found) {
+          setDateFilter(found.date || '')
+          setSelectedEventId(found.id)
+          return
+        }
+      }
+
       // Default date filter to today's local date
       const d = new Date()
       const year = d.getFullYear()
@@ -120,14 +134,16 @@ export default function AdminSpinWheel() {
     }
     setFilteredEvents(filtered)
     
-    // Auto-select first event if matches exist
-    if (filtered.length > 0) {
+    // Auto-select event if paramEventId matches, otherwise first event
+    if (paramEventId && events.some(e => String(e.id) === String(paramEventId))) {
+      setSelectedEventId(paramEventId)
+    } else if (filtered.length > 0) {
       setSelectedEventId(filtered[0].id)
     } else {
       setSelectedEventId('')
       setAllAttendees([])
     }
-  }, [dateFilter, events])
+  }, [dateFilter, events, paramEventId])
 
   // Fetch attendance when event changes
   useEffect(() => {

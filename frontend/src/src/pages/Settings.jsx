@@ -2,11 +2,19 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import BottomNav from '../components/BottomNav'
 import { supabase } from '../lib/supabase'
+import { eventService } from '../services/eventService'
 
 export default function Settings() {
   const navigate = useNavigate()
   const [customLogo, setCustomLogo] = useState('')
   const [primaryColor, setPrimaryColor] = useState('#4F46E5')
+
+  // Event Poster Template Management States
+  const [eventsList, setEventsList] = useState([])
+  const [selectedEventId, setSelectedEventId] = useState('')
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [posterPreview, setPosterPreview] = useState('')
+  const [copiedPosterLink, setCopiedPosterLink] = useState(false)
 
   useEffect(() => {
     // Load saved settings from localStorage first
@@ -17,7 +25,80 @@ export default function Settings() {
 
     // Fallback: load logo from shared app settings
     loadSharedLogo()
+    fetchEventsList()
   }, [])
+
+  const fetchEventsList = async () => {
+    try {
+      const data = await eventService.getEvents()
+      if (data && data.length > 0) {
+        setEventsList(data)
+        setSelectedEventId(String(data[0].id))
+      }
+    } catch (e) {
+      console.error('Error fetching events in settings:', e)
+      try {
+        const { data } = await supabase.from('events').select('*')
+        if (data && data.length > 0) {
+          setEventsList(data)
+          setSelectedEventId(String(data[0].id))
+        }
+      } catch (err) {
+        console.error('Fallback fetch error:', err)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedEventId) {
+      setSelectedEvent(null)
+      setPosterPreview('')
+      return
+    }
+    const evt = eventsList.find((e) => String(e.id) === String(selectedEventId))
+    if (evt) {
+      setSelectedEvent(evt)
+      setPosterPreview(evt.poster_template || evt.image || '')
+    }
+  }, [selectedEventId, eventsList])
+
+  const handlePosterUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file || !selectedEventId) return
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const posterUrl = reader.result
+      setPosterPreview(posterUrl)
+
+      // Update local state
+      setEventsList((prev) =>
+        prev.map((ev) => (String(ev.id) === String(selectedEventId) ? { ...ev, poster_template: posterUrl } : ev))
+      )
+
+      // Save to Supabase events table
+      try {
+        const { error } = await supabase
+          .from('events')
+          .update({ poster_template: posterUrl })
+          .eq('id', selectedEventId)
+
+        if (error) {
+          await supabase.from('events').update({ image: posterUrl }).eq('id', selectedEventId)
+        }
+      } catch (err) {
+        console.error('Error saving poster template:', err)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const copyPosterLink = () => {
+    if (!selectedEventId) return
+    const link = `${window.location.origin}/public/event/${selectedEventId}/poster`
+    navigator.clipboard.writeText(link)
+    setCopiedPosterLink(true)
+    setTimeout(() => setCopiedPosterLink(false), 2500)
+  }
 
   const loadSharedLogo = async () => {
     try {
@@ -65,7 +146,6 @@ export default function Settings() {
   const handleColorChange = (color) => {
     setPrimaryColor(color)
     localStorage.setItem('primaryColor', color)
-    // Update CSS variable for primary color
     document.documentElement.style.setProperty('--color-primary', color)
   }
 
@@ -181,7 +261,7 @@ export default function Settings() {
           </div>
           <button
             onClick={() => navigate('/')}
-            className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+            className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center cursor-pointer"
           >
             <span className="material-symbols-outlined text-slate-600 dark:text-slate-400">close</span>
           </button>
@@ -215,7 +295,7 @@ export default function Settings() {
                   <span className="text-sm text-slate-600 dark:text-slate-400 flex-1">Current logo</span>
                   <button
                     onClick={removeLogo}
-                    className="text-red-500 hover:text-red-600 text-sm font-semibold"
+                    className="text-red-500 hover:text-red-600 text-sm font-semibold cursor-pointer"
                   >
                     Remove
                   </button>
@@ -233,6 +313,98 @@ export default function Settings() {
                   {customLogo ? 'Change Logo' : 'Upload Logo'}
                 </div>
               </label>
+            </div>
+
+            {/* Event Poster Template Management */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="size-12 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-indigo-500 text-2xl">style</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 dark:text-white">Event "I Am Attending" Poster Template</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    Upload custom PNG poster templates & copy shareable delegate poster links
+                  </p>
+                </div>
+              </div>
+
+              {/* Select Event Dropdown */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Select Event
+                </label>
+                <select
+                  value={selectedEventId}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm rounded-lg p-2.5 focus:outline-none focus:border-primary font-semibold cursor-pointer"
+                >
+                  <option value="">-- Choose an Event --</option>
+                  {eventsList.map((evt) => (
+                    <option key={evt.id} value={evt.id}>
+                      {evt.title} ({evt.date})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedEvent && (
+                <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-700">
+                  {/* Current Poster Preview */}
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Current Poster Template Frame</span>
+                    <div className="h-44 w-full bg-slate-100 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center p-2 relative overflow-hidden">
+                      {posterPreview ? (
+                        <img src={posterPreview} alt="Poster Template" className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <p className="text-xs text-slate-400 text-center px-4">No custom template uploaded yet. Upload a PNG frame template below.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload Poster Template Input */}
+                  <label className="block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePosterUpload}
+                      className="hidden"
+                    />
+                    <div className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white text-center py-2.5 px-4 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined text-base">cloud_upload</span>
+                      <span>{posterPreview ? 'Change Poster PNG Template' : 'Upload Poster PNG Template'}</span>
+                    </div>
+                  </label>
+
+                  {/* Shareable Public Link & Action Buttons */}
+                  <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 block">Public Poster Creator Share Link</span>
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}/public/event/${selectedEvent.id}/poster`}
+                        className="flex-1 bg-white dark:bg-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md p-2.5 select-all focus:outline-none min-w-0"
+                      />
+                      <button
+                        onClick={copyPosterLink}
+                        className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-sm">{copiedPosterLink ? 'check' : 'content_copy'}</span>
+                        <span>{copiedPosterLink ? 'Copied!' : 'Copy Link'}</span>
+                      </button>
+                      <button
+                        onClick={() => window.open(`/public/event/${selectedEvent.id}/poster`, '_blank')}
+                        className="px-3.5 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-white text-xs font-bold rounded-md transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                        title="Preview Generator in New Tab"
+                      >
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                        <span>Open</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Color Theme */}
@@ -299,7 +471,7 @@ export default function Settings() {
                 <button
                   key={itemIndex}
                   onClick={() => handleItemClick(item)}
-                  className="w-full bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors text-left"
+                  className="w-full bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
                     <div className={`size-12 rounded-xl bg-${item.color}-500/10 flex items-center justify-center shrink-0`}>

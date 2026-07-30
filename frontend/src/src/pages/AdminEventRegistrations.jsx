@@ -304,6 +304,14 @@ export default function AdminEventRegistrations() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => navigate(`/public/event/${id}/poster`)}
+              title="Generate 'I Am Attending' Poster"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">style</span>
+              <span className="hidden sm:inline">Poster Link</span>
+            </button>
+            <button
               onClick={() => navigate(`/admin/event-attendance/${id}`)}
               title="Delegates Attendance"
               className="flex size-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
@@ -404,7 +412,7 @@ export default function AdminEventRegistrations() {
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white">Lucky Draw Winners</h2>
                   </div>
                   <button
-                    onClick={() => navigate('/admin/spin-wheel')}
+                    onClick={() => navigate(`/admin/spin-wheel?eventId=${id}`)}
                     className="text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-bold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
                   >
                     <span className="material-symbols-outlined text-xs">casino</span>
