@@ -69,7 +69,8 @@ export default function EventAttendingPoster() {
       const eventTitle = event.title || 'Event'
       const eventDate = event.date || ''
       const eventTime = event.time ? ` • ${event.time}` : ''
-      const eventVenue = event.location || event.venue || 'ITLC Venue'
+      const venueParts = [event.location, event.venue, event.address].filter(Boolean)
+      const eventVenue = venueParts.length > 0 ? Array.from(new Set(venueParts)).join(', ') : 'Venue TBD'
       const hashtagTitle = eventTitle.replace(/[^a-zA-Z0-9]/g, '')
       const nameIntro = userName.trim() ? `I (${userName.trim()}) am` : `I am`
 
