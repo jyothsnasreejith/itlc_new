@@ -5,6 +5,7 @@ import BottomNav from '../components/BottomNav'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { QRCodeCanvas } from 'qrcode.react'
+import { getImageUrl } from '../utils/config'
 
 export default function MemberProfileActivityLog() {
   const { id } = useParams()
@@ -387,7 +388,7 @@ export default function MemberProfileActivityLog() {
                 />
               ) : member?.profile_image && !imageLoadError ? (
                 <img 
-                  src={member.profile_image} 
+                  src={getImageUrl(member.profile_image)} 
                   alt={member.full_name}
                   className="w-full h-full rounded-full object-cover"
                   onError={() => setImageLoadError(true)}
@@ -520,11 +521,10 @@ export default function MemberProfileActivityLog() {
                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-36 h-36 rounded-full border-8 border-white dark:border-slate-800 overflow-hidden bg-slate-200 dark:bg-slate-600 shadow-lg z-10">
                     {member?.profile_image && !imageLoadError ? (
                       <img 
-                        src={member.profile_image} 
+                        src={getImageUrl(member.profile_image)} 
                         alt={member.full_name}
                         className="w-full h-full object-cover"
                         onError={() => setImageLoadError(true)}
-                        crossOrigin="anonymous"
                       />
                     ) : (
                       <div className="w-full h-full bg-center bg-cover bg-slate-200 dark:bg-slate-600 flex items-center justify-center">

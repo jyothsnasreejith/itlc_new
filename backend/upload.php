@@ -59,9 +59,12 @@ if (!in_array($folder, ['members', 'events'])) {
     $folder = 'members';
 }
 
-// Ensure the folder exists
+// Ensure the folder exists and set up CORS .htaccess
 if (!file_exists($folder)) {
     mkdir($folder, 0755, true);
+}
+if (!file_exists($folder . '/.htaccess')) {
+    @file_put_contents($folder . '/.htaccess', "<IfModule mod_headers.c>\nHeader set Access-Control-Allow-Origin \"*\"\n</IfModule>\n");
 }
 
 // --- 1. Handle JSON/Base64 Payload ---
