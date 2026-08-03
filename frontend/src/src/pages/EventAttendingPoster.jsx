@@ -18,9 +18,15 @@ export default function EventAttendingPoster() {
 
   // Position and font states for name
   const [textPos, setTextPos] = useState({ x: 100, y: 850 })
-  const [textFontSize, setTextFontSize] = useState(114)
+  const [textFontSize, setTextFontSize] = useState(50)
   const [textColor, setTextColor] = useState('#FFFFFF')
   const [postDescription, setPostDescription] = useState('')
+
+  // Designation field states
+  const [userDesignation, setUserDesignation] = useState('')
+  const [desigPos, setDesigPos] = useState({ x: 100, y: 980 })
+  const [desigFontSize, setDesigFontSize] = useState(50)
+  const [desigColor, setDesigColor] = useState('#FFFFFF')
 
   const [imgPos, setImgPos] = useState({ x: 0, y: 0 })
   const [imgScale, setImgScale] = useState(1)
@@ -260,6 +266,21 @@ export default function EventAttendingPoster() {
     }
   }
 
+  const handleDesigTouchStart = (e) => {
+    e.stopPropagation()
+    if (e.touches.length === 1) {
+      draggingTarget.current = 'desig'
+      startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+
+  const handleDesigMouseDown = (e) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    draggingTarget.current = 'desig'
+    startPos.current = { x: e.clientX, y: e.clientY }
+  }
+
   const handleImageMouseDown = (e) => {
     if (e.button !== 0) return
     draggingTarget.current = 'image'
@@ -309,6 +330,8 @@ export default function EventAttendingPoster() {
         setImgPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
       } else if (draggingTarget.current === 'text') {
         setTextPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
+      } else if (draggingTarget.current === 'desig') {
+        setDesigPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
       }
       startPos.current = { x: pos.x, y: pos.y }
     }
@@ -383,6 +406,14 @@ export default function EventAttendingPoster() {
       ctx.font = `bold ${textFontSize}px sans-serif`
       ctx.fillStyle = textColor
       ctx.fillText(userName, textPos.x, textPos.y)
+    }
+
+    // 4. Draw Designation
+    if (userDesignation) {
+      ctx.textBaseline = 'top'
+      ctx.font = `${desigFontSize}px sans-serif`
+      ctx.fillStyle = desigColor
+      ctx.fillText(userDesignation, desigPos.x, desigPos.y)
     }
 
     const dataUrl = canvas.toDataURL('image/png')
@@ -614,6 +645,18 @@ export default function EventAttendingPoster() {
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:border-primary text-slate-900 dark:text-white text-xs rounded-xl px-4 py-3 focus:outline-none transition-colors"
               />
             </div>
+
+            {/* Designation Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Your Designation / Title (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. CISO, Senior Manager, Director"
+                value={userDesignation}
+                onChange={(e) => setUserDesignation(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:border-primary text-slate-900 dark:text-white text-xs rounded-xl px-4 py-3 focus:outline-none transition-colors"
+              />
+            </div>
           </div>
 
           {/* Step 2: Template Selection */}
@@ -727,6 +770,23 @@ export default function EventAttendingPoster() {
                     </div>
                   )}
 
+                  {/* Designation Text Layer */}
+                  {userDesignation && (
+                    <div
+                      onMouseDown={handleDesigMouseDown}
+                      onTouchStart={handleDesigTouchStart}
+                      className="absolute cursor-grab active:cursor-grabbing border border-dashed border-sky-400/60 p-1 rounded bg-black/20 backdrop-blur-2xs text-white select-none"
+                      style={{
+                        left: desigPos.x * displayScale,
+                        top: desigPos.y * displayScale,
+                        fontSize: `${desigFontSize * displayScale}px`,
+                        color: desigColor
+                      }}
+                    >
+                      {userDesignation}
+                    </div>
+                  )}
+
                   {/* Floating Touch & Quick Controls Overlay */}
                   <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-xl border border-white/20 shadow-lg text-white">
                     <button
@@ -832,6 +892,45 @@ export default function EventAttendingPoster() {
                     <span className="text-xs text-slate-600 dark:text-slate-400 font-mono uppercase">{textColor}</span>
                   </div>
                 </div>
+
+                {/* Designation Controls */}
+                {userDesignation && (
+                  <>
+                    <div className="h-px bg-slate-200 dark:bg-slate-700" />
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-sky-500">Designation</p>
+
+                    {/* Designation Font Size */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-slate-700 dark:text-slate-300">Designation Font Size</span>
+                        <span className="text-primary font-bold">{desigFontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="16"
+                        max="200"
+                        step="2"
+                        value={desigFontSize}
+                        onChange={(e) => setDesigFontSize(parseInt(e.target.value))}
+                        className="w-full accent-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Designation Color */}
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">Designation Color</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={desigColor}
+                          onChange={(e) => setDesigColor(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent cursor-pointer border border-slate-300 dark:border-slate-700"
+                        />
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-mono uppercase">{desigColor}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="pt-3">
                   <button
