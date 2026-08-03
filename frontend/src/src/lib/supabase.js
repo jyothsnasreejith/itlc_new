@@ -108,6 +108,35 @@ class QueryBuilder {
     return this;
   }
 
+function fixImageUrl(url, defaultFolder = 'members') {
+  if (!url || typeof url !== 'string') return url;
+  if (url.startsWith('data:image/')) return url;
+  if (url.includes('localhost') || url.includes('127.0.0.1') || url.includes('/uploads/') || url.startsWith('uploads/')) {
+    const filename = url.split('/').pop();
+    const folder = (filename.toLowerCase().includes('event') || defaultFolder === 'events') ? 'events' : 'members';
+    return `https://gravity-innovations.com/itlc/${folder}/${filename}`;
+  }
+  return url;
+}
+
+function processRowImageUrls(row) {
+  if (!row || typeof row !== 'object') return row;
+  if (Array.isArray(row)) return row.map(processRowImageUrls);
+  
+  const cleaned = { ...row };
+  if (cleaned.profile_image) cleaned.profile_image = fixImageUrl(cleaned.profile_image, 'members');
+  if (cleaned.guest_profile_image) cleaned.guest_profile_image = fixImageUrl(cleaned.guest_profile_image, 'members');
+  if (cleaned.image) cleaned.image = fixImageUrl(cleaned.image, 'events');
+  if (cleaned.poster_template) cleaned.poster_template = fixImageUrl(cleaned.poster_template, 'events');
+  
+  for (const key of Object.keys(cleaned)) {
+    if (cleaned[key] && typeof cleaned[key] === 'object') {
+      cleaned[key] = processRowImageUrls(cleaned[key]);
+    }
+  }
+  return cleaned;
+}
+
   // Thenable interface makes it behave exactly like a Promise when awaited
   async then(onfulfilled, onrejected) {
     try {
@@ -119,6 +148,7 @@ class QueryBuilder {
       if ((this.isSingle || this.isMaybeSingle) && Array.isArray(result)) {
         result = result[0] || null;
       }
+      result = processRowImageUrls(result);
       return onfulfilled({ data: result, error: null });
     } catch (error) {
       console.error(`Database Query Error on table ${this.table}:`, error);
@@ -183,10 +213,14 @@ const storageMock = {
     getPublicUrl: (filePath) => {
       // Extract filename from filepath: member-photos/filename.jpg -> filename.jpg
       const filename = filePath.split('/').pop();
-      const baseUrl = API_URL.replace('/api', '');
+      const folder = filename.toLowerCase().includes('event') ? 'events' : 'members';
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const publicUrl = isLocal 
+        ? `${API_URL.replace('/api', '')}/uploads/${filename}`
+        : `https://gravity-innovations.com/itlc/${folder}/${filename}`;
       return {
         data: {
-          publicUrl: `${baseUrl}/uploads/${filename}`
+          publicUrl
         }
       };
     }
