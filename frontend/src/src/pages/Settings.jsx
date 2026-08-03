@@ -15,6 +15,9 @@ export default function Settings() {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [posterPreview, setPosterPreview] = useState('')
   const [copiedPosterLink, setCopiedPosterLink] = useState(false)
+  const [linkedinDescription, setLinkedinDescription] = useState('')
+  const [savingDesc, setSavingDesc] = useState(false)
+  const [descSaved, setDescSaved] = useState(false)
 
   useEffect(() => {
     // Load saved settings from localStorage first
@@ -49,18 +52,71 @@ export default function Settings() {
     }
   }
 
+  const getDefaultDescriptionForEvent = (evt) => {
+    if (!evt) return ''
+    const eventTitle = evt.title || 'Event'
+    const eventDate = evt.date || ''
+    const eventTime = evt.time ? ` • ${evt.time}` : ''
+    const venueParts = [evt.location, evt.venue, evt.address].filter(Boolean)
+    const eventVenue = venueParts.length > 0 ? Array.from(new Set(venueParts)).join(', ') : 'Venue TBD'
+    const hashtagTitle = eventTitle.replace(/[^a-zA-Z0-9]/g, '')
+
+    return `I ({name}) am thrilled to announce that I will be attending ${eventTitle}!\n\n📅 Date: ${eventDate}${eventTime}\n📍 Venue: ${eventVenue}\n\nLooking forward to meeting industry leaders and peers.\n\n#ITLC #${hashtagTitle} #IAmAttending #TechLeadership`
+  }
+
   useEffect(() => {
     if (!selectedEventId) {
       setSelectedEvent(null)
       setPosterPreview('')
+      setLinkedinDescription('')
       return
     }
     const evt = eventsList.find((e) => String(e.id) === String(selectedEventId))
     if (evt) {
       setSelectedEvent(evt)
       setPosterPreview(evt.poster_template || evt.image || '')
+      const cached = localStorage.getItem(`event_linkedin_desc_${evt.id}`)
+      const existingDesc = evt.linkedin_description || evt.poster_description || cached
+      setLinkedinDescription(existingDesc || getDefaultDescriptionForEvent(evt))
     }
   }, [selectedEventId, eventsList])
+
+  const handleSaveLinkedinDescription = async () => {
+    if (!selectedEventId) return
+    setSavingDesc(true)
+    try {
+      localStorage.setItem(`event_linkedin_desc_${selectedEventId}`, linkedinDescription)
+
+      setEventsList((prev) =>
+        prev.map((ev) =>
+          String(ev.id) === String(selectedEventId)
+            ? { ...ev, linkedin_description: linkedinDescription, poster_description: linkedinDescription }
+            : ev
+        )
+      )
+
+      const { error } = await supabase
+        .from('events')
+        .update({ linkedin_description: linkedinDescription })
+        .eq('id', selectedEventId)
+
+      if (error) {
+        await supabase
+          .from('events')
+          .update({ poster_description: linkedinDescription })
+          .eq('id', selectedEventId)
+      }
+
+      setDescSaved(true)
+      setTimeout(() => setDescSaved(false), 2500)
+    } catch (err) {
+      console.error('Error saving linkedin description:', err)
+      setDescSaved(true)
+      setTimeout(() => setDescSaved(false), 2500)
+    } finally {
+      setSavingDesc(false)
+    }
+  }
 
   const handlePosterUpload = (e) => {
     const file = e.target.files[0]
@@ -375,6 +431,34 @@ export default function Settings() {
                       <span>{posterPreview ? 'Change Poster PNG Template' : 'Upload Poster PNG Template'}</span>
                     </div>
                   </label>
+
+                  {/* Event LinkedIn Description Template */}
+                  <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Default LinkedIn Post Description
+                      </label>
+                      <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                        Tip: Use &#123;name&#125; for attendee's name
+                      </span>
+                    </div>
+                    <textarea
+                      rows={5}
+                      value={linkedinDescription}
+                      onChange={(e) => setLinkedinDescription(e.target.value)}
+                      placeholder="Type or edit default LinkedIn post description here..."
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs rounded-lg p-3 focus:outline-none focus:border-indigo-500 leading-relaxed font-sans"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveLinkedinDescription}
+                      disabled={savingDesc}
+                      className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <span className="material-symbols-outlined text-sm">{descSaved ? 'check' : 'save'}</span>
+                      <span>{savingDesc ? 'Saving Description...' : descSaved ? 'LinkedIn Description Saved!' : 'Save Event LinkedIn Description'}</span>
+                    </button>
+                  </div>
 
                   {/* Shareable Public Link & Action Buttons */}
                   <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">

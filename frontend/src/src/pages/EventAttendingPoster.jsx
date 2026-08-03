@@ -19,7 +19,7 @@ export default function EventAttendingPoster() {
   // Position and font states for name
   const [textPos, setTextPos] = useState({ x: 100, y: 850 })
   const [textFontSize, setTextFontSize] = useState(114)
-  const [textColor, setTextColor] = useState('#000000')
+  const [textColor, setTextColor] = useState('#FFFFFF')
   const [postDescription, setPostDescription] = useState('')
 
   const [imgPos, setImgPos] = useState({ x: 0, y: 0 })
@@ -33,6 +33,13 @@ export default function EventAttendingPoster() {
   const draggingTarget = useRef(null)
   const startPos = useRef({ x: 0, y: 0 })
   const currentHole = useRef(null)
+  const startTouchDistance = useRef(null)
+  const startTouchScale = useRef(1)
+  const imgScaleRef = useRef(imgScale)
+
+  useEffect(() => {
+    imgScaleRef.current = imgScale
+  }, [imgScale])
 
   // Fetch Event Details
   useEffect(() => {
@@ -66,17 +73,35 @@ export default function EventAttendingPoster() {
 
   useEffect(() => {
     if (event) {
-      const eventTitle = event.title || 'Event'
-      const eventDate = event.date || ''
-      const eventTime = event.time ? ` • ${event.time}` : ''
-      const venueParts = [event.location, event.venue, event.address].filter(Boolean)
-      const eventVenue = venueParts.length > 0 ? Array.from(new Set(venueParts)).join(', ') : 'Venue TBD'
-      const hashtagTitle = eventTitle.replace(/[^a-zA-Z0-9]/g, '')
-      const nameIntro = userName.trim() ? `I (${userName.trim()}) am` : `I am`
+      const cachedDesc = localStorage.getItem(`event_linkedin_desc_${event.id}`)
+      const customDesc = event.linkedin_description || event.poster_description || cachedDesc
 
-      setPostDescription(
-        `${nameIntro} thrilled to announce that I will be attending ${eventTitle}!\n\n📅 Date: ${eventDate}${eventTime}\n📍 Venue: ${eventVenue}\n\nLooking forward to meeting industry leaders and peers.\n\n#ITLC #${hashtagTitle} #IAmAttending #TechLeadership`
-      )
+      if (customDesc && customDesc.trim()) {
+        let text = customDesc.trim()
+        const userTrimmed = userName.trim()
+        if (userTrimmed) {
+          if (text.includes('{name}')) {
+            text = text.replaceAll('{name}', userTrimmed)
+          } else if (text.includes('[Name]')) {
+            text = text.replaceAll('[Name]', userTrimmed)
+          } else if (text.toLowerCase().includes('i am')) {
+            text = text.replace(/I am/i, `I (${userTrimmed}) am`)
+          }
+        }
+        setPostDescription(text)
+      } else {
+        const eventTitle = event.title || 'Event'
+        const eventDate = event.date || ''
+        const eventTime = event.time ? ` • ${event.time}` : ''
+        const venueParts = [event.location, event.venue, event.address].filter(Boolean)
+        const eventVenue = venueParts.length > 0 ? Array.from(new Set(venueParts)).join(', ') : 'Venue TBD'
+        const hashtagTitle = eventTitle.replace(/[^a-zA-Z0-9]/g, '')
+        const nameIntro = userName.trim() ? `I (${userName.trim()}) am` : `I am`
+
+        setPostDescription(
+          `${nameIntro} thrilled to announce that I will be attending ${eventTitle}!\n\n📅 Date: ${eventDate}${eventTime}\n📍 Venue: ${eventVenue}\n\nLooking forward to meeting industry leaders and peers.\n\n#ITLC #${hashtagTitle} #IAmAttending #TechLeadership`
+        )
+      }
     }
   }, [event, userName])
 
@@ -209,28 +234,77 @@ export default function EventAttendingPoster() {
     return { x: e.clientX, y: e.clientY }
   }
 
-  const handleImageDragStart = (e) => {
-    draggingTarget.current = 'image'
-    const pos = getClientPos(e)
-    startPos.current = { x: pos.x, y: pos.y }
+  const handleContainerTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      draggingTarget.current = 'image'
+      startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    } else if (e.touches.length === 2) {
+      draggingTarget.current = 'pinch'
+      const touch1 = e.touches[0]
+      const touch2 = e.touches[1]
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY)
+      startTouchDistance.current = dist
+      startTouchScale.current = imgScaleRef.current
+      startPos.current = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      }
+    }
   }
 
-  const handleTextDragStart = (e) => {
-    draggingTarget.current = 'text'
-    const pos = getClientPos(e)
-    startPos.current = { x: pos.x, y: pos.y }
+  const handleTextTouchStart = (e) => {
     e.stopPropagation()
+    if (e.touches.length === 1) {
+      draggingTarget.current = 'text'
+      startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+
+  const handleImageMouseDown = (e) => {
+    if (e.button !== 0) return
+    draggingTarget.current = 'image'
+    startPos.current = { x: e.clientX, y: e.clientY }
+  }
+
+  const handleTextMouseDown = (e) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    draggingTarget.current = 'text'
+    startPos.current = { x: e.clientX, y: e.clientY }
   }
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMove = (e) => {
       if (!draggingTarget.current) return
-      if (e.cancelable && e.type === 'touchmove') {
+
+      if (e.cancelable && (e.type === 'touchmove' || e.type === 'mousemove')) {
         e.preventDefault()
       }
+
+      if (e.touches && e.touches.length === 2 && draggingTarget.current === 'pinch') {
+        const touch1 = e.touches[0]
+        const touch2 = e.touches[1]
+        const newDist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY)
+
+        if (startTouchDistance.current && startTouchDistance.current > 0) {
+          const scaleFactor = newDist / startTouchDistance.current
+          const newScale = Math.min(Math.max(0.05, startTouchScale.current * scaleFactor), 5)
+          setImgScale(newScale)
+        }
+
+        const centerX = (touch1.clientX + touch2.clientX) / 2
+        const centerY = (touch1.clientY + touch2.clientY) / 2
+        const deltaX = (centerX - startPos.current.x) / displayScale
+        const deltaY = (centerY - startPos.current.y) / displayScale
+        setImgPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
+        startPos.current = { x: centerX, y: centerY }
+        return
+      }
+
       const pos = getClientPos(e)
       const deltaX = (pos.x - startPos.current.x) / displayScale
       const deltaY = (pos.y - startPos.current.y) / displayScale
+
       if (draggingTarget.current === 'image') {
         setImgPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
       } else if (draggingTarget.current === 'text') {
@@ -239,21 +313,49 @@ export default function EventAttendingPoster() {
       startPos.current = { x: pos.x, y: pos.y }
     }
 
-    const handleMouseUp = () => {
-      draggingTarget.current = null
+    const handleEnd = (e) => {
+      if (e.touches) {
+        if (e.touches.length === 1 && draggingTarget.current === 'pinch') {
+          draggingTarget.current = 'image'
+          startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        } else if (e.touches.length === 0) {
+          draggingTarget.current = null
+          startTouchDistance.current = null
+        }
+      } else {
+        draggingTarget.current = null
+      }
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-    window.addEventListener('touchmove', handleMouseMove, { passive: false })
-    window.addEventListener('touchend', handleMouseUp)
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleEnd)
+    window.addEventListener('touchmove', handleMove, { passive: false })
+    window.addEventListener('touchend', handleEnd)
+    window.addEventListener('touchcancel', handleEnd)
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('touchmove', handleMouseMove)
-      window.removeEventListener('touchend', handleMouseUp)
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleEnd)
+      window.removeEventListener('touchmove', handleMove)
+      window.removeEventListener('touchend', handleEnd)
+      window.removeEventListener('touchcancel', handleEnd)
     }
   }, [displayScale])
+
+  useEffect(() => {
+    const container = resultContainerRef.current
+    if (!container) return
+
+    const handleWheel = (e) => {
+      e.preventDefault()
+      const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95
+      setImgScale((prev) => Math.min(Math.max(0.05, prev * zoomFactor), 5))
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+    }
+  }, [isAdjusting])
 
   const generateFinalImage = () => {
     const canvas = document.createElement('canvas')
@@ -564,7 +666,7 @@ export default function EventAttendingPoster() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">Adjust Photo & Name Position</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Drag photo or text inside the frame to adjust alignment</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Pinch screen or scroll to zoom. Drag photo or text to reposition alignment.</p>
               </div>
               <button
                 onClick={generateFinalImage}
@@ -585,8 +687,8 @@ export default function EventAttendingPoster() {
                     width: (templateImgRef.current.width || 600) * displayScale,
                     height: (templateImgRef.current.height || 600) * displayScale
                   }}
-                  onMouseDown={handleImageDragStart}
-                  onTouchStart={handleImageDragStart}
+                  onMouseDown={handleImageMouseDown}
+                  onTouchStart={handleContainerTouchStart}
                 >
                   {/* User Image Layer */}
                   <img
@@ -611,9 +713,9 @@ export default function EventAttendingPoster() {
                   {/* Name Text Layer */}
                   {userName && (
                     <div
-                      onMouseDown={handleTextDragStart}
-                      onTouchStart={handleTextDragStart}
-                      className="absolute font-bold cursor-grab active:cursor-grabbing border border-dashed border-amber-400/60 p-1 rounded bg-black/30 backdrop-blur-2xs text-white"
+                      onMouseDown={handleTextMouseDown}
+                      onTouchStart={handleTextTouchStart}
+                      className="absolute font-bold cursor-grab active:cursor-grabbing border border-dashed border-amber-400/60 p-1 rounded bg-black/30 backdrop-blur-2xs text-white select-none"
                       style={{
                         left: textPos.x * displayScale,
                         top: textPos.y * displayScale,
@@ -624,6 +726,58 @@ export default function EventAttendingPoster() {
                       {userName}
                     </div>
                   )}
+
+                  {/* Floating Touch & Quick Controls Overlay */}
+                  <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-xl border border-white/20 shadow-lg text-white">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setImgScale((prev) => Math.min(5, +(prev + 0.1).toFixed(2)))
+                      }}
+                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Zoom In"
+                    >
+                      <span className="material-symbols-outlined text-lg">add</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setImgScale((prev) => Math.max(0.05, +(prev - 0.1).toFixed(2)))
+                      }}
+                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Zoom Out"
+                    >
+                      <span className="material-symbols-outlined text-lg">remove</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const templateW = templateImgRef.current?.width || 600
+                        const templateH = templateImgRef.current?.height || 600
+                        const userW = userImgRef.current?.width || 400
+                        const userH = userImgRef.current?.height || 400
+                        let initialX = 0, initialY = 0, initialScale = 1
+                        if (currentHole.current) {
+                          initialScale = Math.max(currentHole.current.width / userW, currentHole.current.height / userH)
+                          initialX = currentHole.current.centerX - userW / 2
+                          initialY = currentHole.current.centerY - userH / 2
+                        } else {
+                          initialScale = Math.max(templateW / userW, templateH / userH)
+                          initialX = (templateW - userW) / 2
+                          initialY = (templateH - userH) / 2
+                        }
+                        setImgScale(initialScale || 1)
+                        setImgPos({ x: initialX, y: initialY })
+                      }}
+                      className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center transition-colors cursor-pointer"
+                      title="Reset Position & Zoom"
+                    >
+                      <span className="material-symbols-outlined text-lg">restart_alt</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
