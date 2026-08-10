@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import BottomNav from '../components/BottomNav'
@@ -9,12 +9,17 @@ export default function AdminEventRegistrations() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [registrations, setRegistrations] = useState([])
+  const [allRegistrations, setAllRegistrations] = useState([])
   const [filter, setFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('newest') // 'newest' | 'oldest'
-  const [stats, setStats] = useState({ pending: 0, approved: 0, total: 0, totalCollected: 0 })
+  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0, totalCollected: 0 })
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Export dropdown state
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
+  const exportDropdownRef = useRef(null)
 
   // Attendance states
   const [presentAttendees, setPresentAttendees] = useState([])
@@ -24,7 +29,37 @@ export default function AdminEventRegistrations() {
 
   useEffect(() => {
     fetchRegistrations()
-  }, [id, filter, typeFilter])
+  }, [id])
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
+        setExportDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    let filtered = allRegistrations
+
+    if (filter === 'pending') {
+      filtered = filtered.filter(r => r.status === 'pending')
+    } else if (filter === 'approved') {
+      filtered = filtered.filter(r => r.status === 'approved')
+    } else if (filter === 'rejected') {
+      filtered = filtered.filter(r => r.status === 'rejected')
+    }
+
+    if (typeFilter === 'non_member') {
+      filtered = filtered.filter(r => !r.member_id)
+    } else if (typeFilter === 'member') {
+      filtered = filtered.filter(r => !!r.member_id)
+    }
+
+    setRegistrations(filtered)
+  }, [allRegistrations, filter, typeFilter])
 
   async function fetchRegistrations() {
     try {
@@ -41,16 +76,10 @@ export default function AdminEventRegistrations() {
         setEvent(eventData)
       }
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('event_registrations')
         .select('*')
         .eq('event_id', id)
-
-      if (filter !== 'all') {
-        query = query.eq('status', filter)
-      }
-
-      const { data, error } = await query
 
       if (error) throw error
 
@@ -73,23 +102,17 @@ export default function AdminEventRegistrations() {
         }))
       }
 
-      // Apply type filter
-      const filtered = typeFilter === 'non_member'
-        ? normalizedRegistrations.filter(r => !r.member_id)
-        : typeFilter === 'member'
-        ? normalizedRegistrations.filter(r => !!r.member_id)
-        : normalizedRegistrations
+      setAllRegistrations(normalizedRegistrations)
 
-      setRegistrations(filtered)
-
-      // Calculate stats from all (unfiltered)
+      // Calculate stats from all registrations
       const pending = normalizedRegistrations.filter(r => r.status === 'pending').length || 0
       const approved = normalizedRegistrations.filter(r => r.status === 'approved').length || 0
+      const rejected = normalizedRegistrations.filter(r => r.status === 'rejected').length || 0
       const nonMembers = normalizedRegistrations.filter(r => !r.member_id).length || 0
       const totalCollected = normalizedRegistrations
         .filter(r => r.payment_status === 'paid')
         .reduce((sum, r) => sum + (r.payment_amount || 0), 0)
-      setStats({ pending, approved, total: normalizedRegistrations.length || 0, totalCollected, nonMembers })
+      setStats({ pending, approved, rejected, total: normalizedRegistrations.length || 0, totalCollected, nonMembers })
 
       // Fetch Attendance Data
       const { data: attendance, error: attError } = await supabase
@@ -190,9 +213,35 @@ export default function AdminEventRegistrations() {
     return sortOrder === 'newest' ? timeB - timeA : timeA - timeB
   })
 
-  const handleExportToExcel = () => {
-    if (!sortedRegistrations || sortedRegistrations.length === 0) {
-      alert('No registration data available to export for the selected filter.')
+  const handleExportToExcel = (targetStatus = 'all') => {
+    let listToExport = []
+    
+    if (targetStatus === 'all') {
+      listToExport = allRegistrations
+    } else if (targetStatus === 'approved') {
+      listToExport = allRegistrations.filter(r => r.status === 'approved')
+    } else if (targetStatus === 'rejected') {
+      listToExport = allRegistrations.filter(r => r.status === 'rejected')
+    } else if (targetStatus === 'pending') {
+      listToExport = allRegistrations.filter(r => r.status === 'pending')
+    } else {
+      listToExport = sortedRegistrations
+    }
+
+    if (typeFilter === 'non_member') {
+      listToExport = listToExport.filter(r => !r.member_id)
+    } else if (typeFilter === 'member') {
+      listToExport = listToExport.filter(r => !!r.member_id)
+    }
+
+    listToExport = [...listToExport].sort((a, b) => {
+      const timeA = new Date(a.created_at || 0).getTime()
+      const timeB = new Date(b.created_at || 0).getTime()
+      return sortOrder === 'newest' ? timeB - timeA : timeA - timeB
+    })
+
+    if (!listToExport || listToExport.length === 0) {
+      alert(`No ${targetStatus !== 'all' ? targetStatus : ''} registration data available to export.`)
       return
     }
 
@@ -213,7 +262,7 @@ export default function AdminEventRegistrations() {
       'Registration Date & Time'
     ]
 
-    const rows = sortedRegistrations.map((r) => {
+    const rows = listToExport.map((r) => {
       const isNonMember = !r.member_id
       const displayName = isNonMember ? r.guest_name : r.member?.full_name
       const memberType = isNonMember ? 'Non-Member' : 'Member'
@@ -257,7 +306,7 @@ export default function AdminEventRegistrations() {
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
-    const filterLabel = filter === 'all' ? 'all' : filter
+    const filterLabel = targetStatus
     const sortLabel = sortOrder === 'newest' ? 'newest-first' : 'oldest-first'
     const eventName = (event?.title || 'event').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()
     
@@ -455,14 +504,70 @@ export default function AdminEventRegistrations() {
             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400">Reviewing Interests</h3>
-                <button
-                  onClick={handleExportToExcel}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
-                  title="Export filtered registrations to Excel"
-                >
-                  <span className="material-symbols-outlined text-base">table_view</span>
-                  <span>Export ({registrations.length}) to Excel</span>
-                </button>
+                {/* Export Dropdown Menu */}
+                <div className="relative inline-block text-left" ref={exportDropdownRef}>
+                  <button
+                    onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold border border-emerald-200 dark:border-emerald-800 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    title="Export registrations to Excel"
+                  >
+                    <span className="material-symbols-outlined text-base">table_view</span>
+                    <span>Export ({allRegistrations.length}) to Excel</span>
+                    <span className="material-symbols-outlined text-sm">expand_more</span>
+                  </button>
+
+                  {exportDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3 py-1 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-700/60 mb-1">
+                        Select Export Filter
+                      </div>
+                      
+                      <button
+                        onClick={() => { handleExportToExcel('all'); setExportDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base text-slate-500">grid_on</span>
+                          <span>All Registrations</span>
+                        </div>
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 font-bold">{allRegistrations.length}</span>
+                      </button>
+
+                      <button
+                        onClick={() => { handleExportToExcel('approved'); setExportDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base text-emerald-600">check_circle</span>
+                          <span>Approved Only</span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded text-emerald-800 dark:text-emerald-300 font-bold">{stats.approved}</span>
+                      </button>
+
+                      <button
+                        onClick={() => { handleExportToExcel('rejected'); setExportDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base text-rose-600">cancel</span>
+                          <span>Rejected Only</span>
+                        </div>
+                        <span className="text-[10px] bg-rose-100 dark:bg-rose-900/50 px-1.5 py-0.5 rounded text-rose-800 dark:text-rose-300 font-bold">{stats.rejected}</span>
+                      </button>
+
+                      <button
+                        onClick={() => { handleExportToExcel('pending'); setExportDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-base text-amber-600">pending</span>
+                          <span>Pending Only</span>
+                        </div>
+                        <span className="text-[10px] bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded text-amber-800 dark:text-amber-300 font-bold">{stats.pending}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
