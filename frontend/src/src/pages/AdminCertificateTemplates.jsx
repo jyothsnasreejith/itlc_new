@@ -51,9 +51,9 @@ export default function AdminCertificateTemplates() {
   const [loadingEvents, setLoadingEvents] = useState(true)
 
   // Drag & Touch Pinch State
-  const [isDragging, setIsDragging] = useState(false)
+  const [activeDragTarget, setActiveDragTarget] = useState(null) // 'left' | 'right' | null
   const dragStartRef = useRef({ x: 0, y: 0, initialOffsetX: 0, initialOffsetY: 0 })
-  const touchPinchRef = useRef({ initialDist: 0, initialScale: 1 })
+  const touchPinchRef = useRef({ side: 'right', initialDist: 0, initialScale: 1 })
 
   const {
     template,
@@ -97,7 +97,7 @@ export default function AdminCertificateTemplates() {
     await saveTemplate()
   }
 
-  const handleSignatureUpload = (e) => {
+  const handleSignatureUpload = (e, side = 'right') => {
     const file = e.target.files?.[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
@@ -108,10 +108,10 @@ export default function AdminCertificateTemplates() {
       reader.onload = () => {
         setTemplate(prev => ({
           ...prev,
-          signatureImage: reader.result,
-          signatureScale: prev.signatureScale || 1,
-          signatureOffsetX: prev.signatureOffsetX || 0,
-          signatureOffsetY: prev.signatureOffsetY || 0
+          [side === 'left' ? 'leftSignatureImage' : 'signatureImage']: reader.result,
+          [side === 'left' ? 'leftSignatureScale' : 'signatureScale']: prev[side === 'left' ? 'leftSignatureScale' : 'signatureScale'] || 1,
+          [side === 'left' ? 'leftSignatureOffsetX' : 'signatureOffsetX']: prev[side === 'left' ? 'leftSignatureOffsetX' : 'signatureOffsetX'] || 0,
+          [side === 'left' ? 'leftSignatureOffsetY' : 'signatureOffsetY']: prev[side === 'left' ? 'leftSignatureOffsetY' : 'signatureOffsetY'] || 0
         }))
       }
       reader.readAsDataURL(file)
@@ -120,36 +120,36 @@ export default function AdminCertificateTemplates() {
   }
 
   // Mouse Drag Handlers
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e, side = 'right') => {
     e.preventDefault()
-    setIsDragging(true)
+    setActiveDragTarget(side)
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
-      initialOffsetX: template.signatureOffsetX || 0,
-      initialOffsetY: template.signatureOffsetY || 0
+      initialOffsetX: side === 'left' ? (template.leftSignatureOffsetX || 0) : (template.signatureOffsetX || 0),
+      initialOffsetY: side === 'left' ? (template.leftSignatureOffsetY || 0) : (template.signatureOffsetY || 0)
     }
   }
 
   const handleMouseMove = useCallback((e) => {
-    if (!isDragging) return
+    if (!activeDragTarget) return
     const deltaX = e.clientX - dragStartRef.current.x
     const deltaY = e.clientY - dragStartRef.current.y
     const newX = Math.min(120, Math.max(-120, dragStartRef.current.initialOffsetX + deltaX))
     const newY = Math.min(60, Math.max(-60, dragStartRef.current.initialOffsetY + deltaY))
     setTemplate(prev => ({
       ...prev,
-      signatureOffsetX: Math.round(newX),
-      signatureOffsetY: Math.round(newY)
+      [activeDragTarget === 'left' ? 'leftSignatureOffsetX' : 'signatureOffsetX']: Math.round(newX),
+      [activeDragTarget === 'left' ? 'leftSignatureOffsetY' : 'signatureOffsetY']: Math.round(newY)
     }))
-  }, [isDragging, setTemplate])
+  }, [activeDragTarget, setTemplate])
 
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
+    setActiveDragTarget(null)
   }, [])
 
   useEffect(() => {
-    if (isDragging) {
+    if (activeDragTarget) {
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
     }
@@ -157,34 +157,35 @@ export default function AdminCertificateTemplates() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging, handleMouseMove, handleMouseUp])
+  }, [activeDragTarget, handleMouseMove, handleMouseUp])
 
   // Touch Drag & Pinch-to-Zoom Handlers (Mobile)
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e, side = 'right') => {
     if (e.touches.length === 1) {
       const touch = e.touches[0]
-      setIsDragging(true)
+      setActiveDragTarget(side)
       dragStartRef.current = {
         x: touch.clientX,
         y: touch.clientY,
-        initialOffsetX: template.signatureOffsetX || 0,
-        initialOffsetY: template.signatureOffsetY || 0
+        initialOffsetX: side === 'left' ? (template.leftSignatureOffsetX || 0) : (template.signatureOffsetX || 0),
+        initialOffsetY: side === 'left' ? (template.leftSignatureOffsetY || 0) : (template.signatureOffsetY || 0)
       }
     } else if (e.touches.length === 2) {
-      setIsDragging(false)
+      setActiveDragTarget(null)
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       )
       touchPinchRef.current = {
+        side,
         initialDist: dist,
-        initialScale: template.signatureScale || 1
+        initialScale: side === 'left' ? (template.leftSignatureScale || 1) : (template.signatureScale || 1)
       }
     }
   }
 
   const handleTouchMove = (e) => {
-    if (e.touches.length === 1 && isDragging) {
+    if (e.touches.length === 1 && activeDragTarget) {
       const touch = e.touches[0]
       const deltaX = touch.clientX - dragStartRef.current.x
       const deltaY = touch.clientY - dragStartRef.current.y
@@ -192,10 +193,11 @@ export default function AdminCertificateTemplates() {
       const newY = Math.min(60, Math.max(-60, dragStartRef.current.initialOffsetY + deltaY))
       setTemplate(prev => ({
         ...prev,
-        signatureOffsetX: Math.round(newX),
-        signatureOffsetY: Math.round(newY)
+        [activeDragTarget === 'left' ? 'leftSignatureOffsetX' : 'signatureOffsetX']: Math.round(newX),
+        [activeDragTarget === 'left' ? 'leftSignatureOffsetY' : 'signatureOffsetY']: Math.round(newY)
       }))
     } else if (e.touches.length === 2 && touchPinchRef.current.initialDist > 0) {
+      const side = touchPinchRef.current.side || 'right'
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -204,13 +206,13 @@ export default function AdminCertificateTemplates() {
       const newScale = Math.min(3.0, Math.max(0.3, touchPinchRef.current.initialScale * factor))
       setTemplate(prev => ({
         ...prev,
-        signatureScale: parseFloat(newScale.toFixed(2))
+        [side === 'left' ? 'leftSignatureScale' : 'signatureScale']: parseFloat(newScale.toFixed(2))
       }))
     }
   }
 
   const handleTouchEnd = () => {
-    setIsDragging(false)
+    setActiveDragTarget(null)
     touchPinchRef.current.initialDist = 0
   }
 
@@ -464,11 +466,211 @@ export default function AdminCertificateTemplates() {
                   </p>
                 </div>
 
-                {/* Signature Image Upload & Interactive Positioning Controls */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 flex justify-between items-center">
-                    <span>Signature Image</span>
-                    {template.signatureImage && (
+                {/* Left Signatory Section (Optional) */}
+                <div className="p-4 bg-slate-50/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/80 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={template.leftSignatoryEnabled || false}
+                        onChange={(e) => setTemplate({ ...template, leftSignatoryEnabled: e.target.checked })}
+                        className="size-4 text-primary rounded border-slate-300 dark:border-slate-700 focus:ring-primary"
+                      />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                        Left Signatory (Optional)
+                      </span>
+                    </label>
+                    {template.leftSignatoryEnabled && template.leftSignatureImage && (
+                      <button
+                        type="button"
+                        onClick={() => setTemplate({ ...template, leftSignatureImage: '', leftSignatureScale: 1, leftSignatureOffsetX: 0, leftSignatureOffsetY: 0 })}
+                        className="text-[11px] text-red-500 hover:underline font-semibold"
+                      >
+                        Remove Signature
+                      </button>
+                    )}
+                  </div>
+
+                  {template.leftSignatoryEnabled && (
+                    <div className="space-y-3 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                      {/* Left Signature Image */}
+                      {template.leftSignatureImage ? (
+                        <div className="space-y-3">
+                          <div className="relative p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
+                            <img
+                              src={template.leftSignatureImage}
+                              alt="Left Signature"
+                              className="h-9 max-w-[130px] object-contain"
+                            />
+                            <label className="cursor-pointer text-xs text-primary font-semibold hover:underline">
+                              Change Image
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleSignatureUpload(e, 'left')}
+                              />
+                            </label>
+                          </div>
+
+                          {/* Range Controls & Reset */}
+                          <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">open_with</span> Position Controls
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setTemplate({ ...template, leftSignatureScale: 1, leftSignatureOffsetX: 0, leftSignatureOffsetY: 0 })}
+                                className="text-[10px] text-primary hover:underline font-semibold"
+                              >
+                                Reset
+                              </button>
+                            </div>
+
+                            {/* Size / Scale Slider */}
+                            <div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
+                                <span>Size / Scale</span>
+                                <span>{Math.round((template.leftSignatureScale || 1) * 100)}%</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setTemplate({ ...template, leftSignatureScale: Math.max(0.3, parseFloat(((template.leftSignatureScale || 1) - 0.1).toFixed(2))) })}
+                                  className="size-6 bg-slate-200 dark:bg-slate-800 rounded flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs hover:bg-slate-300"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="range"
+                                  min="0.3"
+                                  max="3.0"
+                                  step="0.05"
+                                  value={template.leftSignatureScale || 1}
+                                  onChange={(e) => setTemplate({ ...template, leftSignatureScale: parseFloat(e.target.value) })}
+                                  className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setTemplate({ ...template, leftSignatureScale: Math.min(3.0, parseFloat(((template.leftSignatureScale || 1) + 0.1).toFixed(2))) })}
+                                  className="size-6 bg-slate-200 dark:bg-slate-800 rounded flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs hover:bg-slate-300"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Horizontal Position (X) */}
+                            <div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
+                                <span>Horizontal Offset (X)</span>
+                                <span>{template.leftSignatureOffsetX || 0}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="-120"
+                                max="120"
+                                step="1"
+                                value={template.leftSignatureOffsetX || 0}
+                                onChange={(e) => setTemplate({ ...template, leftSignatureOffsetX: parseInt(e.target.value, 10) })}
+                                className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                              />
+                            </div>
+
+                            {/* Vertical Position (Y) */}
+                            <div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
+                                <span>Vertical Offset (Y)</span>
+                                <span>{template.leftSignatureOffsetY || 0}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="-60"
+                                max="60"
+                                step="1"
+                                value={template.leftSignatureOffsetY || 0}
+                                onChange={(e) => setTemplate({ ...template, leftSignatureOffsetY: parseInt(e.target.value, 10) })}
+                                className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="block">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleSignatureUpload(e, 'left')}
+                            className="hidden"
+                          />
+                          <div className="cursor-pointer border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/50 bg-white/60 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 py-2.5 rounded-lg font-semibold transition-all text-center text-xs flex items-center justify-center gap-1.5">
+                            <span className="material-symbols-outlined text-md">draw</span>
+                            Upload Left Signature Image
+                          </div>
+                        </label>
+                      )}
+
+                      {/* Signatory Name */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                          Signatory Name
+                        </label>
+                        <input
+                          type="text"
+                          value={template.leftSignatoryName || ''}
+                          onChange={(e) => setTemplate({ ...template, leftSignatoryName: e.target.value })}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/45"
+                          placeholder="e.g., General Secretary"
+                        />
+                      </div>
+
+                      {/* Signatory Designation */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                          Signatory Designation
+                        </label>
+                        <input
+                          type="text"
+                          value={template.leftSignatoryDesignation || ''}
+                          onChange={(e) => setTemplate({ ...template, leftSignatoryDesignation: e.target.value })}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/45"
+                          placeholder="e.g., IT Leaders Community"
+                        />
+                      </div>
+
+                      {/* Signatory Company */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                          Signatory Company / Organization
+                        </label>
+                        <input
+                          type="text"
+                          value={template.leftSignatoryCompany || ''}
+                          onChange={(e) => setTemplate({ ...template, leftSignatoryCompany: e.target.value })}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/45"
+                          placeholder="e.g., ITLC Kerala"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Signatory Section (Optional) */}
+                <div className="p-4 bg-slate-50/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/80 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={template.rightSignatoryEnabled !== false}
+                        onChange={(e) => setTemplate({ ...template, rightSignatoryEnabled: e.target.checked })}
+                        className="size-4 text-primary rounded border-slate-300 dark:border-slate-700 focus:ring-primary"
+                      />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                        Right Signatory (Optional)
+                      </span>
+                    </label>
+                    {template.rightSignatoryEnabled !== false && template.signatureImage && (
                       <button
                         type="button"
                         onClick={() => setTemplate({ ...template, signatureImage: '', signatureScale: 1, signatureOffsetX: 0, signatureOffsetY: 0 })}
@@ -477,172 +679,171 @@ export default function AdminCertificateTemplates() {
                         Remove Signature
                       </button>
                     )}
-                  </label>
+                  </div>
 
-                  {template.signatureImage ? (
-                    <div className="space-y-3">
-                      <div className="relative p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
-                        <img
-                          src={template.signatureImage}
-                          alt="Uploaded Signature"
-                          className="h-10 max-w-[150px] object-contain"
-                        />
-                        <label className="cursor-pointer text-xs text-primary font-semibold hover:underline">
-                          Change Image
+                  {template.rightSignatoryEnabled !== false && (
+                    <div className="space-y-3 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                      {/* Right Signature Image */}
+                      {template.signatureImage ? (
+                        <div className="space-y-3">
+                          <div className="relative p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
+                            <img
+                              src={template.signatureImage}
+                              alt="Right Signature"
+                              className="h-9 max-w-[130px] object-contain"
+                            />
+                            <label className="cursor-pointer text-xs text-primary font-semibold hover:underline">
+                              Change Image
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleSignatureUpload(e, 'right')}
+                              />
+                            </label>
+                          </div>
+
+                          {/* Range Controls & Reset */}
+                          <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">open_with</span> Position Controls
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setTemplate({ ...template, signatureScale: 1, signatureOffsetX: 0, signatureOffsetY: 0 })}
+                                className="text-[10px] text-primary hover:underline font-semibold"
+                              >
+                                Reset
+                              </button>
+                            </div>
+
+                            {/* Size / Scale Slider */}
+                            <div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
+                                <span>Size / Scale</span>
+                                <span>{Math.round((template.signatureScale || 1) * 100)}%</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setTemplate({ ...template, signatureScale: Math.max(0.3, parseFloat(((template.signatureScale || 1) - 0.1).toFixed(2))) })}
+                                  className="size-6 bg-slate-200 dark:bg-slate-800 rounded flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs hover:bg-slate-300"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="range"
+                                  min="0.3"
+                                  max="3.0"
+                                  step="0.05"
+                                  value={template.signatureScale || 1}
+                                  onChange={(e) => setTemplate({ ...template, signatureScale: parseFloat(e.target.value) })}
+                                  className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setTemplate({ ...template, signatureScale: Math.min(3.0, parseFloat(((template.signatureScale || 1) + 0.1).toFixed(2))) })}
+                                  className="size-6 bg-slate-200 dark:bg-slate-800 rounded flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs hover:bg-slate-300"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Horizontal Position (X) */}
+                            <div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
+                                <span>Horizontal Offset (X)</span>
+                                <span>{template.signatureOffsetX || 0}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="-120"
+                                max="120"
+                                step="1"
+                                value={template.signatureOffsetX || 0}
+                                onChange={(e) => setTemplate({ ...template, signatureOffsetX: parseInt(e.target.value, 10) })}
+                                className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                              />
+                            </div>
+
+                            {/* Vertical Position (Y) */}
+                            <div>
+                              <div className="flex justify-between text-[10px] font-semibold text-slate-500 mb-1">
+                                <span>Vertical Offset (Y)</span>
+                                <span>{template.signatureOffsetY || 0}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="-60"
+                                max="60"
+                                step="1"
+                                value={template.signatureOffsetY || 0}
+                                onChange={(e) => setTemplate({ ...template, signatureOffsetY: parseInt(e.target.value, 10) })}
+                                className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="block">
                           <input
                             type="file"
                             accept="image/*"
+                            onChange={(e) => handleSignatureUpload(e, 'right')}
                             className="hidden"
-                            onChange={handleSignatureUpload}
                           />
+                          <div className="cursor-pointer border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/50 bg-white/60 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 py-2.5 rounded-lg font-semibold transition-all text-center text-xs flex items-center justify-center gap-1.5">
+                            <span className="material-symbols-outlined text-md">draw</span>
+                            Upload Right Signature Image
+                          </div>
                         </label>
+                      )}
+
+                      {/* Signatory Name */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                          Signatory Name
+                        </label>
+                        <input
+                          type="text"
+                          value={template.signatoryName || ''}
+                          onChange={(e) => setTemplate({ ...template, signatoryName: e.target.value })}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/45"
+                          placeholder="e.g., ITLC President"
+                        />
                       </div>
 
-                      {/* Range Controls & Reset */}
-                      <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">open_with</span> Size & Position Controls
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setTemplate({ ...template, signatureScale: 1, signatureOffsetX: 0, signatureOffsetY: 0 })}
-                            className="text-[11px] text-primary hover:underline font-semibold"
-                          >
-                            Reset
-                          </button>
-                        </div>
+                      {/* Signatory Designation */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                          Signatory Designation
+                        </label>
+                        <input
+                          type="text"
+                          value={template.signatoryDesignation || ''}
+                          onChange={(e) => setTemplate({ ...template, signatoryDesignation: e.target.value })}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/45"
+                          placeholder="e.g., IT Leaders Community"
+                        />
+                      </div>
 
-                        {/* Size / Scale Slider */}
-                        <div>
-                          <div className="flex justify-between text-[11px] font-semibold text-slate-500 mb-1">
-                            <span>Size / Scale</span>
-                            <span>{Math.round((template.signatureScale || 1) * 100)}%</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setTemplate({ ...template, signatureScale: Math.max(0.3, parseFloat(((template.signatureScale || 1) - 0.1).toFixed(2))) })}
-                              className="size-7 bg-slate-200 dark:bg-slate-800 rounded flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs hover:bg-slate-300"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="range"
-                              min="0.3"
-                              max="3.0"
-                              step="0.05"
-                              value={template.signatureScale || 1}
-                              onChange={(e) => setTemplate({ ...template, signatureScale: parseFloat(e.target.value) })}
-                              className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setTemplate({ ...template, signatureScale: Math.min(3.0, parseFloat(((template.signatureScale || 1) + 0.1).toFixed(2))) })}
-                              className="size-7 bg-slate-200 dark:bg-slate-800 rounded flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 text-xs hover:bg-slate-300"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Horizontal Position (X) */}
-                        <div>
-                          <div className="flex justify-between text-[11px] font-semibold text-slate-500 mb-1">
-                            <span>Horizontal Position (X)</span>
-                            <span>{template.signatureOffsetX || 0}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="-120"
-                            max="120"
-                            step="1"
-                            value={template.signatureOffsetX || 0}
-                            onChange={(e) => setTemplate({ ...template, signatureOffsetX: parseInt(e.target.value, 10) })}
-                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                          />
-                        </div>
-
-                        {/* Vertical Position (Y) */}
-                        <div>
-                          <div className="flex justify-between text-[11px] font-semibold text-slate-500 mb-1">
-                            <span>Vertical Position (Y)</span>
-                            <span>{template.signatureOffsetY || 0}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="-60"
-                            max="60"
-                            step="1"
-                            value={template.signatureOffsetY || 0}
-                            onChange={(e) => setTemplate({ ...template, signatureOffsetY: parseInt(e.target.value, 10) })}
-                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                          />
-                        </div>
-
-                        <p className="text-[10px] text-slate-400 italic">
-                          💡 You can also drag or pinch-to-zoom directly on the signature in the preview!
-                        </p>
+                      {/* Signatory Company */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
+                          Signatory Company / Organization
+                        </label>
+                        <input
+                          type="text"
+                          value={template.signatoryCompany || ''}
+                          onChange={(e) => setTemplate({ ...template, signatoryCompany: e.target.value })}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary/45"
+                          placeholder="e.g., ITLC Kerala"
+                        />
                       </div>
                     </div>
-                  ) : (
-                    <label className="block">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleSignatureUpload}
-                        className="hidden"
-                      />
-                      <div className="cursor-pointer border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary/50 dark:hover:border-primary/50 bg-slate-50/50 dark:bg-slate-900/30 text-slate-500 dark:text-slate-400 py-3 rounded-lg font-semibold transition-all text-center text-xs flex items-center justify-center gap-1.5">
-                        <span className="material-symbols-outlined text-md">draw</span>
-                        Upload Signature Image
-                      </div>
-                    </label>
                   )}
-                </div>
-
-                {/* Signatory Name */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
-                    Signatory Name
-                  </label>
-                  <input
-                    type="text"
-                    value={template.signatoryName}
-                    onChange={(e) => setTemplate({ ...template, signatoryName: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/45"
-                    placeholder="ITLC President"
-                    required
-                  />
-                </div>
-
-                {/* Signatory Designation */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
-                    Signatory Designation
-                  </label>
-                  <input
-                    type="text"
-                    value={template.signatoryDesignation}
-                    onChange={(e) => setTemplate({ ...template, signatoryDesignation: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/45"
-                    placeholder="IT Leaders Community"
-                    required
-                  />
-                </div>
-
-                {/* Signatory Company */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
-                    Signatory Company / Organization
-                  </label>
-                  <input
-                    type="text"
-                    value={template.signatoryCompany || ''}
-                    onChange={(e) => setTemplate({ ...template, signatoryCompany: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/45"
-                    placeholder="IT Leaders Community Kerala"
-                  />
                 </div>
 
                 {/* Save Button */}
@@ -716,53 +917,104 @@ export default function AdminCertificateTemplates() {
               </div>
 
               {/* Signatories Section (shrink-0) */}
-              <div className="flex justify-end items-end border-t border-slate-200 dark:border-slate-700/50 pt-1.5 md:pt-2 shrink-0">
-                {/* Interactive Signatory Section */}
-                <div className="text-center font-sans max-w-[140px] md:max-w-[190px] shrink-0">
-                  <div className="min-h-[28px] md:min-h-[38px] w-full flex items-end justify-center mb-0.5 relative">
-                    {template.signatureImage ? (
-                      <div
-                        onMouseDown={handleMouseDown}
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                        style={{
-                          transform: `translate(${template.signatureOffsetX || 0}px, ${template.signatureOffsetY || 0}px) scale(${template.signatureScale || 1})`,
-                          transformOrigin: 'bottom center',
-                          cursor: isDragging ? 'grabbing' : 'grab',
-                          touchAction: 'none'
-                        }}
-                        className="relative transition-transform duration-75 select-none p-1 rounded border border-dashed border-primary/40 hover:border-primary group"
-                        title="Drag to position, pinch on mobile to resize"
-                      >
-                        <img
-                          src={template.signatureImage}
-                          alt="Signature"
-                          className="h-7 md:h-9 max-w-[120px] md:max-w-[160px] object-contain pointer-events-none"
-                        />
-                        <div className="absolute -top-2 -right-2 size-4 bg-primary text-white rounded-full flex items-center justify-center text-[9px] shadow opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="material-symbols-outlined text-[10px]">open_with</span>
+              <div className={`flex ${template.leftSignatoryEnabled && template.rightSignatoryEnabled !== false ? 'justify-between' : template.leftSignatoryEnabled ? 'justify-start' : 'justify-end'} items-end border-t border-slate-200 dark:border-slate-700/50 pt-1.5 md:pt-2 shrink-0`}>
+                {/* Left Signatory */}
+                {template.leftSignatoryEnabled && (
+                  <div className="text-center font-sans max-w-[140px] md:max-w-[190px] shrink-0">
+                    <div className="min-h-[28px] md:min-h-[38px] w-full flex items-end justify-center mb-0.5 relative">
+                      {template.leftSignatureImage ? (
+                        <div
+                          onMouseDown={(e) => handleMouseDown(e, 'left')}
+                          onTouchStart={(e) => handleTouchStart(e, 'left')}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          style={{
+                            transform: `translate(${template.leftSignatureOffsetX || 0}px, ${template.leftSignatureOffsetY || 0}px) scale(${template.leftSignatureScale || 1})`,
+                            transformOrigin: 'bottom center',
+                            cursor: activeDragTarget === 'left' ? 'grabbing' : 'grab',
+                            touchAction: 'none'
+                          }}
+                          className="relative transition-transform duration-75 select-none p-1 rounded border border-dashed border-primary/40 hover:border-primary group"
+                          title="Drag to position left signature"
+                        >
+                          <img
+                            src={template.leftSignatureImage}
+                            alt="Left Signature"
+                            className="h-7 md:h-9 max-w-[120px] md:max-w-[160px] object-contain pointer-events-none"
+                          />
+                          <div className="absolute -top-2 -right-2 size-4 bg-primary text-white rounded-full flex items-center justify-center text-[9px] shadow opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="material-symbols-outlined text-[10px]">open_with</span>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <span className={`font-serif italic text-xs md:text-sm ${selectedPreset.accentText} opacity-80 select-none`}>
-                        {template.signatoryName ? (template.signatoryName.substring(0, 1) + '. ' + template.signatoryName.split(' ').pop()) : ''}
-                      </span>
+                      ) : (
+                        <span className={`font-serif italic text-xs md:text-sm ${selectedPreset.accentText} opacity-80 select-none`}>
+                          {template.leftSignatoryName ? (template.leftSignatoryName.substring(0, 1) + '. ' + template.leftSignatoryName.split(' ').pop()) : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="w-20 md:w-28 border-t border-slate-300 dark:border-slate-600 mx-auto"></div>
+                    <h4 className="text-[9px] md:text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 select-none truncate">
+                      {template.leftSignatoryName}
+                    </h4>
+                    <p className="text-[7px] md:text-[9px] text-slate-500 dark:text-slate-400 select-none uppercase tracking-wider truncate">
+                      {template.leftSignatoryDesignation}
+                    </p>
+                    {template.leftSignatoryCompany && (
+                      <p className="text-[7px] md:text-[9px] text-slate-500 dark:text-slate-400 font-medium select-none uppercase tracking-wider truncate mt-0.5">
+                        {template.leftSignatoryCompany}
+                      </p>
                     )}
                   </div>
-                  <div className="w-20 md:w-28 border-t border-slate-300 dark:border-slate-600 mx-auto"></div>
-                  <h4 className="text-[9px] md:text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 select-none truncate">
-                    {template.signatoryName}
-                  </h4>
-                  <p className="text-[7px] md:text-[9px] text-slate-500 dark:text-slate-400 select-none uppercase tracking-wider truncate">
-                    {template.signatoryDesignation}
-                  </p>
-                  {template.signatoryCompany && (
-                    <p className="text-[7px] md:text-[9px] text-slate-500 dark:text-slate-400 font-medium select-none uppercase tracking-wider truncate mt-0.5">
-                      {template.signatoryCompany}
+                )}
+
+                {/* Right Signatory */}
+                {template.rightSignatoryEnabled !== false && (
+                  <div className="text-center font-sans max-w-[140px] md:max-w-[190px] shrink-0">
+                    <div className="min-h-[28px] md:min-h-[38px] w-full flex items-end justify-center mb-0.5 relative">
+                      {template.signatureImage ? (
+                        <div
+                          onMouseDown={(e) => handleMouseDown(e, 'right')}
+                          onTouchStart={(e) => handleTouchStart(e, 'right')}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
+                          style={{
+                            transform: `translate(${template.signatureOffsetX || 0}px, ${template.signatureOffsetY || 0}px) scale(${template.signatureScale || 1})`,
+                            transformOrigin: 'bottom center',
+                            cursor: activeDragTarget === 'right' ? 'grabbing' : 'grab',
+                            touchAction: 'none'
+                          }}
+                          className="relative transition-transform duration-75 select-none p-1 rounded border border-dashed border-primary/40 hover:border-primary group"
+                          title="Drag to position right signature"
+                        >
+                          <img
+                            src={template.signatureImage}
+                            alt="Right Signature"
+                            className="h-7 md:h-9 max-w-[120px] md:max-w-[160px] object-contain pointer-events-none"
+                          />
+                          <div className="absolute -top-2 -right-2 size-4 bg-primary text-white rounded-full flex items-center justify-center text-[9px] shadow opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="material-symbols-outlined text-[10px]">open_with</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className={`font-serif italic text-xs md:text-sm ${selectedPreset.accentText} opacity-80 select-none`}>
+                          {template.signatoryName ? (template.signatoryName.substring(0, 1) + '. ' + template.signatoryName.split(' ').pop()) : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="w-20 md:w-28 border-t border-slate-300 dark:border-slate-600 mx-auto"></div>
+                    <h4 className="text-[9px] md:text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 select-none truncate">
+                      {template.signatoryName}
+                    </h4>
+                    <p className="text-[7px] md:text-[9px] text-slate-500 dark:text-slate-400 select-none uppercase tracking-wider truncate">
+                      {template.signatoryDesignation}
                     </p>
-                  )}
-                </div>
+                    {template.signatoryCompany && (
+                      <p className="text-[7px] md:text-[9px] text-slate-500 dark:text-slate-400 font-medium select-none uppercase tracking-wider truncate mt-0.5">
+                        {template.signatoryCompany}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
             </div>

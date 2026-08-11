@@ -322,8 +322,19 @@ export default function EventSelfCheckIn() {
       headerText: t.headerText || 'IT Leaders Community Kerala',
       subTitle: t.subTitle || 'This is proudly presented to',
       body,
-      signatoryName: t.signatoryName,
-      signatoryDesignation: t.signatoryDesignation,
+      // Left Signatory
+      leftSignatoryEnabled: t.leftSignatoryEnabled ?? false,
+      leftSignatoryName: t.leftSignatoryName || '',
+      leftSignatoryDesignation: t.leftSignatoryDesignation || '',
+      leftSignatoryCompany: t.leftSignatoryCompany || '',
+      leftSignatureImage: t.leftSignatureImage || '',
+      leftSignatureScale: typeof t.leftSignatureScale === 'number' ? t.leftSignatureScale : 1,
+      leftSignatureOffsetX: typeof t.leftSignatureOffsetX === 'number' ? t.leftSignatureOffsetX : 0,
+      leftSignatureOffsetY: typeof t.leftSignatureOffsetY === 'number' ? t.leftSignatureOffsetY : 0,
+      // Right Signatory
+      rightSignatoryEnabled: t.rightSignatoryEnabled ?? true,
+      signatoryName: t.signatoryName || '',
+      signatoryDesignation: t.signatoryDesignation || '',
       signatoryCompany: t.signatoryCompany || '',
       signatureImage: t.signatureImage || '',
       signatureScale: typeof t.signatureScale === 'number' ? t.signatureScale : 1,
@@ -757,38 +768,76 @@ export default function EventSelfCheckIn() {
                 />
               </div>
 
-              <div className="flex justify-end items-end border-t border-slate-200/50 pt-1.5 shrink-0">
-                <div className="text-center font-sans max-w-[110px] leading-tight shrink-0">
-                  <div className="min-h-[16px] flex items-end justify-center mb-0.5 relative">
-                    {getCertDetails().signatureImage ? (
-                      <img
-                        src={getCertDetails().signatureImage}
-                        alt="Signature"
-                        style={{
-                          transform: `translate(${(getCertDetails().signatureOffsetX || 0) * 0.6}px, ${(getCertDetails().signatureOffsetY || 0) * 0.6}px) scale(${getCertDetails().signatureScale || 1})`,
-                          transformOrigin: 'bottom center'
-                        }}
-                        className="h-4 md:h-5 max-w-[80px] object-contain mx-auto transition-transform duration-75 select-none pointer-events-none"
-                      />
-                    ) : (
-                      <span className={`font-serif italic text-[8px] ${activeCertPreset.text} opacity-70`}>
-                        {getCertDetails().signatoryName ? (getCertDetails().signatoryName.substring(0, 1) + '. ' + getCertDetails().signatoryName.split(' ').pop()) : ''}
-                      </span>
+              <div className={`flex ${getCertDetails().leftSignatoryEnabled && getCertDetails().rightSignatoryEnabled ? 'justify-between' : getCertDetails().leftSignatoryEnabled ? 'justify-start' : 'justify-end'} items-end border-t border-slate-200/50 pt-1.5 shrink-0`}>
+                {/* Left Signatory */}
+                {getCertDetails().leftSignatoryEnabled && (
+                  <div className="text-center font-sans max-w-[110px] leading-tight shrink-0">
+                    <div className="min-h-[16px] flex items-end justify-center mb-0.5 relative">
+                      {getCertDetails().leftSignatureImage ? (
+                        <img
+                          src={getCertDetails().leftSignatureImage}
+                          alt="Left Signature"
+                          style={{
+                            transform: `translate(${(getCertDetails().leftSignatureOffsetX || 0) * 0.6}px, ${(getCertDetails().leftSignatureOffsetY || 0) * 0.6}px) scale(${getCertDetails().leftSignatureScale || 1})`,
+                            transformOrigin: 'bottom center'
+                          }}
+                          className="h-4 md:h-5 max-w-[80px] object-contain mx-auto transition-transform duration-75 select-none pointer-events-none"
+                        />
+                      ) : (
+                        <span className={`font-serif italic text-[8px] ${activeCertPreset.text} opacity-70`}>
+                          {getCertDetails().leftSignatoryName ? (getCertDetails().leftSignatoryName.substring(0, 1) + '. ' + getCertDetails().leftSignatoryName.split(' ').pop()) : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="w-16 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
+                    <h4 className="text-[7px] font-bold text-slate-700 dark:text-slate-300 mt-0.5 truncate">
+                      {getCertDetails().leftSignatoryName}
+                    </h4>
+                    <p className="text-[5px] text-slate-400 uppercase tracking-wider truncate">
+                      {getCertDetails().leftSignatoryDesignation}
+                    </p>
+                    {getCertDetails().leftSignatoryCompany && (
+                      <p className="text-[4px] text-slate-400 uppercase tracking-widest truncate mt-0.5">
+                        {getCertDetails().leftSignatoryCompany}
+                      </p>
                     )}
                   </div>
-                  <div className="w-16 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
-                  <h4 className="text-[7px] font-bold text-slate-700 dark:text-slate-300 mt-0.5 truncate">
-                    {getCertDetails().signatoryName}
-                  </h4>
-                  <p className="text-[5px] text-slate-400 uppercase tracking-wider truncate">
-                    {getCertDetails().signatoryDesignation}
-                  </p>
-                  {getCertDetails().signatoryCompany && (
-                    <p className="text-[4px] text-slate-400 uppercase tracking-widest truncate mt-0.5">
-                      {getCertDetails().signatoryCompany}
+                )}
+
+                {/* Right Signatory */}
+                {getCertDetails().rightSignatoryEnabled && (
+                  <div className="text-center font-sans max-w-[110px] leading-tight shrink-0">
+                    <div className="min-h-[16px] flex items-end justify-center mb-0.5 relative">
+                      {getCertDetails().signatureImage ? (
+                        <img
+                          src={getCertDetails().signatureImage}
+                          alt="Signature"
+                          style={{
+                            transform: `translate(${(getCertDetails().signatureOffsetX || 0) * 0.6}px, ${(getCertDetails().signatureOffsetY || 0) * 0.6}px) scale(${getCertDetails().signatureScale || 1})`,
+                            transformOrigin: 'bottom center'
+                          }}
+                          className="h-4 md:h-5 max-w-[80px] object-contain mx-auto transition-transform duration-75 select-none pointer-events-none"
+                        />
+                      ) : (
+                        <span className={`font-serif italic text-[8px] ${activeCertPreset.text} opacity-70`}>
+                          {getCertDetails().signatoryName ? (getCertDetails().signatoryName.substring(0, 1) + '. ' + getCertDetails().signatoryName.split(' ').pop()) : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="w-16 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
+                    <h4 className="text-[7px] font-bold text-slate-700 dark:text-slate-300 mt-0.5 truncate">
+                      {getCertDetails().signatoryName}
+                    </h4>
+                    <p className="text-[5px] text-slate-400 uppercase tracking-wider truncate">
+                      {getCertDetails().signatoryDesignation}
                     </p>
-                  )}
-                </div>
+                    {getCertDetails().signatoryCompany && (
+                      <p className="text-[4px] text-slate-400 uppercase tracking-widest truncate mt-0.5">
+                        {getCertDetails().signatoryCompany}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -882,38 +931,76 @@ export default function EventSelfCheckIn() {
             />
           </div>
 
-          <div className="flex justify-end items-end border-t border-slate-200/50 pt-3 shrink-0">
-            <div className="text-center font-sans max-w-[200px] leading-tight shrink-0">
-              <div className="min-h-[32px] flex items-end justify-center mb-1 relative">
-                {getCertDetails().signatureImage ? (
-                  <img
-                    src={getCertDetails().signatureImage}
-                    alt="Signature"
-                    style={{
-                      transform: `translate(${(getCertDetails().signatureOffsetX || 0) * 1.5}px, ${(getCertDetails().signatureOffsetY || 0) * 1.5}px) scale(${getCertDetails().signatureScale || 1})`,
-                      transformOrigin: 'bottom center'
-                    }}
-                    className="h-9 max-w-[160px] object-contain mx-auto transition-transform duration-75 select-none"
-                  />
-                ) : (
-                  <span className={`font-serif italic text-sm ${activeCertPreset.text} opacity-70`}>
-                    {getCertDetails().signatoryName ? (getCertDetails().signatoryName.substring(0, 1) + '. ' + getCertDetails().signatoryName.split(' ').pop()) : ''}
-                  </span>
+          <div className={`flex ${getCertDetails().leftSignatoryEnabled && getCertDetails().rightSignatoryEnabled ? 'justify-between' : getCertDetails().leftSignatoryEnabled ? 'justify-start' : 'justify-end'} items-end border-t border-slate-200/50 pt-3 shrink-0`}>
+            {/* Left Signatory */}
+            {getCertDetails().leftSignatoryEnabled && (
+              <div className="text-center font-sans max-w-[200px] leading-tight shrink-0">
+                <div className="min-h-[32px] flex items-end justify-center mb-1 relative">
+                  {getCertDetails().leftSignatureImage ? (
+                    <img
+                      src={getCertDetails().leftSignatureImage}
+                      alt="Left Signature"
+                      style={{
+                        transform: `translate(${(getCertDetails().leftSignatureOffsetX || 0) * 1.5}px, ${(getCertDetails().leftSignatureOffsetY || 0) * 1.5}px) scale(${getCertDetails().leftSignatureScale || 1})`,
+                        transformOrigin: 'bottom center'
+                      }}
+                      className="h-9 max-w-[160px] object-contain mx-auto transition-transform duration-75 select-none"
+                    />
+                  ) : (
+                    <span className={`font-serif italic text-sm ${activeCertPreset.text} opacity-70`}>
+                      {getCertDetails().leftSignatoryName ? (getCertDetails().leftSignatoryName.substring(0, 1) + '. ' + getCertDetails().leftSignatoryName.split(' ').pop()) : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="w-24 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1 truncate">
+                  {getCertDetails().leftSignatoryName}
+                </h4>
+                <p className="text-[8px] text-slate-400 uppercase tracking-wider truncate">
+                  {getCertDetails().leftSignatoryDesignation}
+                </p>
+                {getCertDetails().leftSignatoryCompany && (
+                  <p className="text-[7px] text-slate-400 uppercase tracking-widest truncate mt-0.5">
+                    {getCertDetails().leftSignatoryCompany}
+                  </p>
                 )}
               </div>
-              <div className="w-24 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
-              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1 truncate">
-                {getCertDetails().signatoryName}
-              </h4>
-              <p className="text-[8px] text-slate-400 uppercase tracking-wider truncate">
-                {getCertDetails().signatoryDesignation}
-              </p>
-              {getCertDetails().signatoryCompany && (
-                <p className="text-[7px] text-slate-400 uppercase tracking-widest truncate mt-0.5">
-                  {getCertDetails().signatoryCompany}
+            )}
+
+            {/* Right Signatory */}
+            {getCertDetails().rightSignatoryEnabled && (
+              <div className="text-center font-sans max-w-[200px] leading-tight shrink-0">
+                <div className="min-h-[32px] flex items-end justify-center mb-1 relative">
+                  {getCertDetails().signatureImage ? (
+                    <img
+                      src={getCertDetails().signatureImage}
+                      alt="Signature"
+                      style={{
+                        transform: `translate(${(getCertDetails().signatureOffsetX || 0) * 1.5}px, ${(getCertDetails().signatureOffsetY || 0) * 1.5}px) scale(${getCertDetails().signatureScale || 1})`,
+                        transformOrigin: 'bottom center'
+                      }}
+                      className="h-9 max-w-[160px] object-contain mx-auto transition-transform duration-75 select-none"
+                    />
+                  ) : (
+                    <span className={`font-serif italic text-sm ${activeCertPreset.text} opacity-70`}>
+                      {getCertDetails().signatoryName ? (getCertDetails().signatoryName.substring(0, 1) + '. ' + getCertDetails().signatoryName.split(' ').pop()) : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="w-24 border-t border-slate-200 dark:border-slate-700 mx-auto"></div>
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-1 truncate">
+                  {getCertDetails().signatoryName}
+                </h4>
+                <p className="text-[8px] text-slate-400 uppercase tracking-wider truncate">
+                  {getCertDetails().signatoryDesignation}
                 </p>
-              )}
-            </div>
+                {getCertDetails().signatoryCompany && (
+                  <p className="text-[7px] text-slate-400 uppercase tracking-widest truncate mt-0.5">
+                    {getCertDetails().signatoryCompany}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
