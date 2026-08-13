@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { eventService } from '../services/eventService'
 import BottomNav from '../components/BottomNav'
 
 export default function EventsList() {
@@ -39,17 +40,7 @@ export default function EventsList() {
   }, [activeTab])
 
   useEffect(() => {
-    async function checkEventCounters() {
-      const { error } = await supabase
-        .from('event_counters')
-        .select('event_id', { head: true, count: 'exact' })
-      setHasEventCounters(!error)
-    }
-    checkEventCounters()
-  }, [])
-
-  // fetch when page changes (load more)
-  useEffect(() => {
+    // fetch when page changes (load more)
     if (page === 0) return
     fetchEvents(page)
   }, [page])
@@ -70,138 +61,37 @@ export default function EventsList() {
     try {
       setLoading(true)
       const pageStartTime = performance.now()
-      const logs = []
-      const d = new Date()
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      const currentDate = `${year}-${month}-${day}`
       
-      const start = pageToFetch * PAGE_SIZE
-      const end = start + PAGE_SIZE - 1
-      let query = supabase
-        .from('events')
-        .select('id, title, description, date, time, image, location, fee')
-        .range(start, end)
-        .order('date', { ascending: activeTab === 'upcoming' })
-
-      if (activeTab === 'upcoming') {
-        query = query.gte('date', currentDate)
-      } else {
-        query = query.lt('date', currentDate)
-      }
-      const eventsStart = performance.now()
-      const { data, error } = await query
-      const eventsDuration = performance.now() - eventsStart
-      logs.push({
-        api: 'GET /events',
-        filter: activeTab,
-        duration: eventsDuration.toFixed(2),
-        count: data?.length || 0,
-        status: error ? 'ERROR' : 'OK'
+      // Step 1: Fetch paginated events from eventService (fast, unblocked)
+      const eventData = await eventService.getPaginatedEvents({
+        activeTab,
+        page: pageToFetch,
+        pageSize: PAGE_SIZE
       })
+
+      const eventsDuration = performance.now() - pageStartTime
       console.log(`[EventsList] ${activeTab} events query duration: ${eventsDuration.toFixed(2)}ms`)
 
-      if (error) throw error
-
-      const eventData = data || []
-      // append for subsequent pages
       setEvents(prev => pageToFetch === 0 ? eventData : [...prev, ...eventData])
       setHasMore((eventData || []).length === PAGE_SIZE)
 
-      // Fetch registration counts and (for upcoming events only) member previews in one batched request
+      // Turn off loading IMMEDIATELY so event cards render on screen without delay!
+      setLoading(false)
+
+      // Step 2: Fetch registration counts in background without blocking initial render
       if (eventData.length > 0) {
         const eventIds = eventData.map(event => event.id)
-
-        if (hasEventCounters === false && activeTab === 'expired') {
-          console.warn('Skipping expired tab fallback because event_counters is unavailable')
-          logs.push({
-            api: 'SKIP /event_counters',
-            filter: activeTab,
-            duration: '0.00',
-            count: 0,
-            status: 'SKIPPED (no table)'
+        eventService.getEventRegistrationCounts(eventIds)
+          .then(counts => {
+            setRegistrationCounts(prev => ({ ...prev, ...counts }))
           })
-          const counts = {}
-          eventIds.forEach(id => { counts[id] = 0 })
-          setRegistrationCounts(prev => ({ ...prev, ...counts }))
-        } else {
-          // Fetch per-event registration counts from counters table (fast)
-          const countersStart = performance.now()
-          const { data: counters, error: countersError } = await supabase
-            .from('event_counters')
-            .select('event_id, registration_count')
-            .in('event_id', eventIds)
-          const countersDuration = performance.now() - countersStart
-          logs.push({
-            api: 'GET /event_counters',
-            filter: `${eventIds.length} events`,
-            duration: countersDuration.toFixed(2),
-            count: counters?.length || 0,
-            status: countersError ? 'ERROR (fallback)' : 'OK'
+          .catch(err => {
+            console.error('Error fetching registration counts in background:', err)
           })
-
-          if (!countersError) {
-            const counts = {}
-            counters?.forEach(row => { counts[row.event_id] = row.registration_count || 0 })
-            // default zero for events not present in counters
-            eventIds.forEach(id => { if (!(id in counts)) counts[id] = 0 })
-            setRegistrationCounts(prev => ({ ...prev, ...counts }))
-          } else if (activeTab === 'expired') {
-            console.warn('event_counters unavailable for expired tab; skipping heavy fallback', countersError)
-            const counts = {}
-            eventIds.forEach(id => { counts[id] = 0 })
-            setRegistrationCounts(prev => ({ ...prev, ...counts }))
-          } else {
-            console.warn('event_counters not available, falling back to registrations table', countersError)
-            // fallback to count from registrations table
-            const regsStart = performance.now()
-            const { data: registrations, error: registrationError } = await supabase
-              .from('event_registrations')
-              .select('event_id, members (id, full_name, profile_image)')
-              .in('event_id', eventIds)
-              .order('created_at', { ascending: false })
-            const regsDuration = performance.now() - regsStart
-            logs.push({
-              api: 'GET /event_registrations',
-              filter: `${eventIds.length} events`,
-              duration: regsDuration.toFixed(2),
-              count: registrations?.length || 0,
-              status: registrationError ? 'ERROR' : 'OK (FALLBACK)'
-            })
-            if (registrationError) throw registrationError
-            const counts = {}
-            const members = {}
-            for (const reg of registrations || []) {
-              const eventId = reg.event_id
-              counts[eventId] = (counts[eventId] || 0) + 1
-              if (reg.members) {
-                members[eventId] = members[eventId] || []
-                if (members[eventId].length < 3) members[eventId].push(reg.members)
-              }
-            }
-            setRegistrationCounts(prev => ({ ...prev, ...counts }))
-            setRegisteredMembers(prev => ({ ...prev, ...members }))
-          }
-        }
       }
-      
-      const totalDuration = performance.now() - pageStartTime
-      logs.push({
-        api: '=== TOTAL TIME ===',
-        filter: `page ${pageToFetch}`,
-        duration: totalDuration.toFixed(2),
-        count: eventData.length,
-        status: 'COMPLETE'
-      })
-      
-      setPerformanceLog(logs)
-      console.table(logs)
     } catch (error) {
       console.error('Error fetching events:', error)
-      // Show no events if fetch fails
       setEvents([])
-      alert('Failed to load events. Please check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -347,42 +237,7 @@ export default function EventsList() {
   const openMembersModal = async (event) => {
     setMembersModalEvent(event)
     try {
-      const { data: registrations } = await supabase
-        .from('event_registrations')
-        .select(`
-          id,
-          status,
-          created_at,
-          payment_status,
-          payment_id,
-          payment_amount,
-          updated_at,
-          members (
-            id,
-            full_name,
-            email,
-            phone_number,
-            designation,
-            company,
-            itlc_chapter_name,
-            profile_image
-          )
-        `)
-        .eq('event_id', event.id)
-        .order('created_at', { ascending: false })
-
-      const members = (registrations || [])
-        .filter(reg => reg.members)
-        .map(reg => ({
-          ...reg.members,
-          registration_status: reg.status,
-          registered_at: reg.created_at,
-          payment_status: reg.payment_status,
-          payment_id: reg.payment_id,
-          payment_amount: reg.payment_amount,
-          payment_at: reg.updated_at
-        }))
-
+      const members = await eventService.getEventRegistrations(event.id)
       setAllEventMembers(members)
       setMembersModalOpen(true)
     } catch (error) {
@@ -398,28 +253,30 @@ export default function EventsList() {
   }
 
   return (
-    <div className="relative flex min-h-screen max-w-full mx-auto flex-col bg-background-light dark:bg-background-dark overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24 flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-10 flex items-center bg-white/80 dark:bg-background-dark/80 backdrop-blur-md p-4 pb-2 justify-between border-b border-slate-100 dark:border-slate-800">
-        <div 
-          onClick={() => navigate(-1)}
-          className="text-slate-900 dark:text-slate-100 flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
+      <header className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div 
+            onClick={() => navigate(-1)}
+            className="text-slate-900 dark:text-slate-100 flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </div>
+          <h2 className="text-slate-900 dark:text-slate-100 text-lg sm:text-xl font-bold leading-tight tracking-tight flex-1 text-center">
+            All Events
+          </h2>
+          <div className="flex w-10 items-center justify-end">
+            <button className="flex size-10 cursor-pointer items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <span className="material-symbols-outlined">search</span>
+            </button>
+          </div>
         </div>
-        <h2 className="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
-          All Events
-        </h2>
-        <div className="flex w-10 items-center justify-end">
-          <button className="flex size-10 cursor-pointer items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <span className="material-symbols-outlined">search</span>
-          </button>
-        </div>
-      </div>
+      </header>
 
       {/* Segmented Control */}
-      <div className="flex px-4 py-4 bg-white dark:bg-background-dark">
-        <div className="flex h-11 flex-1 max-w-7xl mx-auto items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+      <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900">
+        <div className="flex h-11 flex-1 max-w-7xl mx-auto items-center justify-center rounded-xl bg-slate-200/70 dark:bg-slate-800 p-1">
           <label className={`flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-lg px-2 transition-all ${
             activeTab === 'upcoming' 
               ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' 

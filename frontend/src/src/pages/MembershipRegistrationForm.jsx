@@ -9,14 +9,14 @@ export default function MembershipRegistrationForm() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const isPublicRoute = location.pathname.startsWith('/public')
-  
+
   // Extract event and phone from query params
   const eventId = searchParams.get('event')
   const phoneParam = searchParams.get('phone')
-  
+
   const [event, setEvent] = useState(null)
   const [eventLoading, setEventLoading] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     salutation: '',
     fullName: '',
@@ -55,7 +55,7 @@ export default function MembershipRegistrationForm() {
             .select('id, title, description, date, time, capacity')
             .eq('id', eventId)
             .maybeSingle()
-          
+
           if (error) throw error
           setEvent(data)
         } catch (error) {
@@ -64,7 +64,7 @@ export default function MembershipRegistrationForm() {
           setEventLoading(false)
         }
       }
-      
+
       fetchEvent()
     }
   }, [eventId])
@@ -125,7 +125,7 @@ export default function MembershipRegistrationForm() {
     const persEmail = formData.personalEmail || null
 
     setLoading(true)
-    
+
     try {
       const newMember = await memberService.registerMember({
         salutation: formData.salutation,
@@ -151,7 +151,7 @@ export default function MembershipRegistrationForm() {
         profile_image: formData.profileImage,
         status: 'pending'
       })
-      
+
       // If this was an event registration request, create event registration record
       if (eventId && newMember && newMember.id) {
         try {
@@ -165,7 +165,7 @@ export default function MembershipRegistrationForm() {
           // Don't throw - member was created successfully
         }
       }
-      
+
       const source = isPublicRoute ? 'public' : 'app'
       navigate(`/thanks?type=membership&source=${source}`)
     } catch (error) {
@@ -187,7 +187,7 @@ export default function MembershipRegistrationForm() {
       {/* Header */}
       <header className="flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
         {!isPublicRoute && (
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="text-slate-900 dark:text-white flex size-12 shrink-0 items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
           >
@@ -455,7 +455,7 @@ export default function MembershipRegistrationForm() {
                 value={formData.currentCompany}
                 onChange={handleChange}
                 className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none"
-                placeholder="e.g. GRAVITY INNOVATIVE SOLUTIONS"
+                placeholder="e.g. "
                 type="text"
                 required
               />

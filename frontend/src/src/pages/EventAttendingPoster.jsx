@@ -28,6 +28,12 @@ export default function EventAttendingPoster() {
   const [desigFontSize, setDesigFontSize] = useState(50)
   const [desigColor, setDesigColor] = useState('#FFFFFF')
 
+  // Company field states
+  const [userCompany, setUserCompany] = useState('')
+  const [compPos, setCompPos] = useState({ x: 100, y: 1050 })
+  const [compFontSize, setCompFontSize] = useState(45)
+  const [compColor, setCompColor] = useState('#FFFFFF')
+
   const [imgPos, setImgPos] = useState({ x: 0, y: 0 })
   const [imgScale, setImgScale] = useState(1)
   const [displayScale, setDisplayScale] = useState(1)
@@ -210,6 +216,14 @@ export default function EventAttendingPoster() {
               x: currentHole.current.x + currentHole.current.width / 2 - 100,
               y: currentHole.current.y + currentHole.current.height + 20
             })
+            setDesigPos({
+              x: currentHole.current.x + currentHole.current.width / 2 - 100,
+              y: currentHole.current.y + currentHole.current.height + 80
+            })
+            setCompPos({
+              x: currentHole.current.x + currentHole.current.width / 2 - 100,
+              y: currentHole.current.y + currentHole.current.height + 140
+            })
           } else {
             initialScale = Math.max(templateW / userW, templateH / userH)
             initialX = (templateW - userW) / 2
@@ -281,6 +295,21 @@ export default function EventAttendingPoster() {
     startPos.current = { x: e.clientX, y: e.clientY }
   }
 
+  const handleCompTouchStart = (e) => {
+    e.stopPropagation()
+    if (e.touches.length === 1) {
+      draggingTarget.current = 'comp'
+      startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+
+  const handleCompMouseDown = (e) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    draggingTarget.current = 'comp'
+    startPos.current = { x: e.clientX, y: e.clientY }
+  }
+
   const handleImageMouseDown = (e) => {
     if (e.button !== 0) return
     draggingTarget.current = 'image'
@@ -332,6 +361,8 @@ export default function EventAttendingPoster() {
         setTextPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
       } else if (draggingTarget.current === 'desig') {
         setDesigPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
+      } else if (draggingTarget.current === 'comp') {
+        setCompPos((prev) => ({ x: prev.x + deltaX, y: prev.y + deltaY }))
       }
       startPos.current = { x: pos.x, y: pos.y }
     }
@@ -414,6 +445,14 @@ export default function EventAttendingPoster() {
       ctx.font = `${desigFontSize}px sans-serif`
       ctx.fillStyle = desigColor
       ctx.fillText(userDesignation, desigPos.x, desigPos.y)
+    }
+
+    // 5. Draw Company
+    if (userCompany) {
+      ctx.textBaseline = 'top'
+      ctx.font = `${compFontSize}px sans-serif`
+      ctx.fillStyle = compColor
+      ctx.fillText(userCompany, compPos.x, compPos.y)
     }
 
     const dataUrl = canvas.toDataURL('image/png')
@@ -657,6 +696,18 @@ export default function EventAttendingPoster() {
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:border-primary text-slate-900 dark:text-white text-xs rounded-xl px-4 py-3 focus:outline-none transition-colors"
               />
             </div>
+
+            {/* Company Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Your Company / Organization (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. TCS, Wipro"
+                value={userCompany}
+                onChange={(e) => setUserCompany(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:border-primary text-slate-900 dark:text-white text-xs rounded-xl px-4 py-3 focus:outline-none transition-colors"
+              />
+            </div>
           </div>
 
           {/* Step 2: Template Selection */}
@@ -784,6 +835,23 @@ export default function EventAttendingPoster() {
                       }}
                     >
                       {userDesignation}
+                    </div>
+                  )}
+
+                  {/* Company Text Layer */}
+                  {userCompany && (
+                    <div
+                      onMouseDown={handleCompMouseDown}
+                      onTouchStart={handleCompTouchStart}
+                      className="absolute cursor-grab active:cursor-grabbing border border-dashed border-emerald-400/60 p-1 rounded bg-black/20 backdrop-blur-2xs text-white select-none"
+                      style={{
+                        left: compPos.x * displayScale,
+                        top: compPos.y * displayScale,
+                        fontSize: `${compFontSize * displayScale}px`,
+                        color: compColor
+                      }}
+                    >
+                      {userCompany}
                     </div>
                   )}
 
@@ -927,6 +995,45 @@ export default function EventAttendingPoster() {
                           className="w-9 h-9 rounded-lg bg-transparent cursor-pointer border border-slate-300 dark:border-slate-700"
                         />
                         <span className="text-xs text-slate-600 dark:text-slate-400 font-mono uppercase">{desigColor}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Company Controls */}
+                {userCompany && (
+                  <>
+                    <div className="h-px bg-slate-200 dark:bg-slate-700" />
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-500">Company / Organization</p>
+
+                    {/* Company Font Size */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-slate-700 dark:text-slate-300">Company Font Size</span>
+                        <span className="text-primary font-bold">{compFontSize}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="16"
+                        max="200"
+                        step="2"
+                        value={compFontSize}
+                        onChange={(e) => setCompFontSize(parseInt(e.target.value))}
+                        className="w-full accent-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Company Color */}
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">Company Color</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={compColor}
+                          onChange={(e) => setCompColor(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent cursor-pointer border border-slate-300 dark:border-slate-700"
+                        />
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-mono uppercase">{compColor}</span>
                       </div>
                     </div>
                   </>

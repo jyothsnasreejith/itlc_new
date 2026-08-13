@@ -11,14 +11,8 @@ html {
 body {
   min-height: 100dvh;
   font-family: 'Be Vietnam Pro', sans-serif;
-  background-color: #f5f7f8;
+  background-color: #f8fafc;
   overflow-x: hidden;
-}
-
-@media (min-width: 768px) {
-  body {
-    background-color: #e5e7eb;
-  }
 }
 
 #root {
