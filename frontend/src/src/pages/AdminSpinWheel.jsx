@@ -244,10 +244,12 @@ export default function AdminSpinWheel() {
   const activeCandidates = allAttendees.filter(att => {
     // 1. Time Filter
     if (cutoffTime) {
-      const checkInDate = new Date(att.checkedInAt)
-      const hours = String(checkInDate.getHours()).padStart(2, '0')
-      const minutes = String(checkInDate.getMinutes()).padStart(2, '0')
-      const checkInTimeStr = `${hours}:${minutes}`
+      const checkInTimeStr = new Date(att.checkedInAt).toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
       if (checkInTimeStr > cutoffTime) return false
     }
     // 2. Excluded filter

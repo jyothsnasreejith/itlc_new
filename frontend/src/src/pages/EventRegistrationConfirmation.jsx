@@ -486,7 +486,8 @@ export default function EventRegistrationConfirmation() {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata'
     })
   }
 

@@ -82,7 +82,8 @@ export default function EventManagerDashboard() {
       weekday: 'short',
       month: 'short', 
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
     })
   }
 

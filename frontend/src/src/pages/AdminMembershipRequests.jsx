@@ -498,14 +498,15 @@ export default function AdminMembershipRequests() {
                             Joined {new Date(request.created_at).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric',
-                              year: 'numeric'
+                              year: 'numeric',
+                              timeZone: 'Asia/Kolkata'
                             })}
                           </p>
                         </div>
                       )}
                       {activeTab === 'pending' && (
                         <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
-                          Requested {new Date(request.created_at).toLocaleDateString()}
+                          Requested {new Date(request.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                         </p>
                       )}
                     </div>
@@ -650,7 +651,8 @@ export default function AdminMembershipRequests() {
                     Applied on {new Date(selectedMember.created_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
-                      day: 'numeric'
+                      day: 'numeric',
+                      timeZone: 'Asia/Kolkata'
                     })}
                   </p>
                 </div>

@@ -208,7 +208,7 @@ export default function AdminUserManagement() {
                       <span>•</span>
                       <span className="flex items-center gap-1">
                         <span className="material-symbols-outlined text-xs">calendar_today</span>
-                        {new Date(user.created_at).toLocaleDateString()}
+                        {new Date(user.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                       </span>
                     </div>
                   </div>

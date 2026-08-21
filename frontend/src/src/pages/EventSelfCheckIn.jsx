@@ -287,7 +287,7 @@ export default function EventSelfCheckIn() {
   }
 
   function formatTime(ts) {
-    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   }
 
   // Certificate dynamic rendering data builder

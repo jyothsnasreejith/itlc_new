@@ -182,7 +182,7 @@ export default function AdminEventAttendance() {
     )
   }
 
-  const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
 
   const methodLabel = (method) => {
     if (method === 'self_checkin') return 'Self check-in'

@@ -101,7 +101,8 @@ export default function EventsList() {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 
       month: 'short', 
-      day: 'numeric' 
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata' 
     })
   }
 
@@ -111,7 +112,8 @@ export default function EventsList() {
       weekday: 'long',
       year: 'numeric', 
       month: 'long', 
-      day: 'numeric' 
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata' 
     })
   }
 
@@ -857,7 +859,8 @@ export default function EventsList() {
                                       <span className="text-[10px] text-slate-400 dark:text-slate-500 pl-1">
                                         {new Date(member.payment_at).toLocaleString('en-IN', {
                                           day: '2-digit', month: 'short', year: 'numeric',
-                                          hour: '2-digit', minute: '2-digit', hour12: true
+                                          hour: '2-digit', minute: '2-digit', hour12: true,
+                                          timeZone: 'Asia/Kolkata'
                                         })}
                                       </span>
                                     )}

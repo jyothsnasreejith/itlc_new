@@ -119,7 +119,8 @@ export default function EventManagerAttendance() {
   const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString('en-US', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
     })
   }
 
@@ -128,7 +129,8 @@ export default function EventManagerAttendance() {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
     })
   }
 
@@ -288,12 +290,19 @@ export default function EventManagerAttendance() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-slate-900 dark:text-white truncate">
+                            <div className="text-base font-bold text-slate-900 dark:text-white leading-tight truncate">
                               {member.full_name}
                             </div>
-                            <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                              {member.designation || 'Member'}
-                            </div>
+                            {member.designation && (
+                              <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 leading-snug truncate">
+                                {member.designation}
+                              </div>
+                            )}
+                            {member.company && (
+                              <div className="text-[11px] font-medium text-primary dark:text-blue-400 leading-snug truncate">
+                                {member.company}
+                              </div>
+                            )}
                             <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">
                               {member.email}
                             </div>
