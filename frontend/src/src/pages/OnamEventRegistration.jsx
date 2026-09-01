@@ -405,8 +405,13 @@ export default function OnamEventRegistration() {
                             type="text" 
                             value={att.name}
                             onChange={(e) => updateAttendee(idx, 'name', e.target.value)}
-                            placeholder={idx === 0 ? "Member Name" : "Attendee Name"}
-                            style={styles.tableInput}
+                            placeholder={idx === 0 ? "Verified Member Name" : "Attendee Name"}
+                            readOnly={idx === 0}
+                            disabled={idx === 0}
+                            style={{
+                              ...styles.tableInput,
+                              ...(idx === 0 ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#334155', fontWeight: '600' } : {})
+                            }}
                           />
                         </td>
                         <td style={styles.td}>
