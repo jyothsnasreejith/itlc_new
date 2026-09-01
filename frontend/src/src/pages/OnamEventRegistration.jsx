@@ -38,13 +38,43 @@ export default function OnamEventRegistration() {
   const handlePayment = async () => {
     setErrorMessage('');
     if (attendeeType === 'member') {
+      if (!registeredMobile || registeredMobile.trim().length < 10) {
+        setErrorMessage('Please enter a valid 10-digit registered mobile number.');
+        return;
+      }
       if (mobileVerificationState.status !== 'verified') {
         setErrorMessage('Please verify registered ITLC mobile number before payment.');
         return;
       }
     } else {
-      if (!guestForm.name || !guestForm.mobile) {
-        setErrorMessage('Please enter guest name and mobile number.');
+      if (!guestForm.name || !guestForm.name.trim()) {
+        setErrorMessage('Please enter Guest Name.');
+        return;
+      }
+      if (!guestForm.company || !guestForm.company.trim()) {
+        setErrorMessage('Please enter Company Name.');
+        return;
+      }
+      if (!guestForm.designation || !guestForm.designation.trim()) {
+        setErrorMessage('Please enter Designation.');
+        return;
+      }
+      if (!guestForm.mobile || !guestForm.mobile.trim()) {
+        setErrorMessage('Please enter Mobile Number.');
+        return;
+      }
+      const cleanGuestPhone = guestForm.mobile.replace(/\D/g, '');
+      if (cleanGuestPhone.length < 10) {
+        setErrorMessage('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+      if (!guestForm.email || !guestForm.email.trim()) {
+        setErrorMessage('Please enter Email Address.');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(guestForm.email.trim())) {
+        setErrorMessage('Please enter a valid email address.');
         return;
       }
     }
@@ -320,7 +350,9 @@ export default function OnamEventRegistration() {
               </div>
 
               <div style={styles.formRow} className="onam-form-row">
-                <label style={styles.label} className="onam-label">Registered Mobile No :</label>
+                <label style={styles.label} className="onam-label">
+                  Registered Mobile No <span style={{ color: '#ef4444' }}>*</span> :
+                </label>
                 <div style={{ display: 'flex', gap: '8px', flex: 1, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
                   <input 
                     type="text"
@@ -358,7 +390,7 @@ export default function OnamEventRegistration() {
                   <thead>
                     <tr>
                       <th style={styles.th}>#</th>
-                      <th style={styles.th}>Name</th>
+                      <th style={styles.th}>Name <span style={{ color: '#ef4444' }}>*</span></th>
                       <th style={styles.th}>Relation</th>
                       <th style={styles.th}>Minor &lt; 5yrs</th>
                       <th style={styles.th}>Amt (₹)</th>
@@ -381,7 +413,11 @@ export default function OnamEventRegistration() {
                           <select 
                             value={att.relation}
                             onChange={(e) => updateAttendee(idx, 'relation', e.target.value)}
-                            style={styles.tableSelect}
+                            disabled={idx === 0}
+                            style={{
+                              ...styles.tableSelect,
+                              ...(idx === 0 ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : {})
+                            }}
                           >
                             <option value="self">Self</option>
                             <option value="spouse">Spouse</option>
@@ -397,7 +433,11 @@ export default function OnamEventRegistration() {
                           <select 
                             value={att.isMinor ? 'Yes' : 'No'}
                             onChange={(e) => updateAttendee(idx, 'isMinor', e.target.value === 'Yes')}
-                            style={styles.tableSelect}
+                            disabled={idx === 0}
+                            style={{
+                              ...styles.tableSelect,
+                              ...(idx === 0 ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed' } : {})
+                            }}
                           >
                             <option value="No">No</option>
                             <option value="Yes">Yes</option>
@@ -449,7 +489,9 @@ export default function OnamEventRegistration() {
               <div style={styles.guestSplitLayout} className="onam-guest-split">
                 <div style={styles.guestInputsColumn}>
                   <div style={styles.formRow} className="onam-form-row">
-                    <label style={styles.guestLabel} className="onam-label">Name :</label>
+                    <label style={styles.guestLabel} className="onam-label">
+                      Name <span style={{ color: '#ef4444' }}>*</span> :
+                    </label>
                     <input 
                       type="text" 
                       value={guestForm.name}
@@ -458,7 +500,9 @@ export default function OnamEventRegistration() {
                     />
                   </div>
                   <div style={styles.formRow} className="onam-form-row">
-                    <label style={styles.guestLabel} className="onam-label">Company :</label>
+                    <label style={styles.guestLabel} className="onam-label">
+                      Company <span style={{ color: '#ef4444' }}>*</span> :
+                    </label>
                     <input 
                       type="text" 
                       value={guestForm.company}
@@ -467,7 +511,9 @@ export default function OnamEventRegistration() {
                     />
                   </div>
                   <div style={styles.formRow} className="onam-form-row">
-                    <label style={styles.guestLabel} className="onam-label">Designation :</label>
+                    <label style={styles.guestLabel} className="onam-label">
+                      Designation <span style={{ color: '#ef4444' }}>*</span> :
+                    </label>
                     <input 
                       type="text" 
                       value={guestForm.designation}
@@ -476,7 +522,9 @@ export default function OnamEventRegistration() {
                     />
                   </div>
                   <div style={styles.formRow} className="onam-form-row">
-                    <label style={styles.guestLabel} className="onam-label">Mobile :</label>
+                    <label style={styles.guestLabel} className="onam-label">
+                      Mobile <span style={{ color: '#ef4444' }}>*</span> :
+                    </label>
                     <input 
                       type="text" 
                       value={guestForm.mobile}
@@ -485,7 +533,9 @@ export default function OnamEventRegistration() {
                     />
                   </div>
                   <div style={styles.formRow} className="onam-form-row">
-                    <label style={styles.guestLabel} className="onam-label">Email :</label>
+                    <label style={styles.guestLabel} className="onam-label">
+                      Email <span style={{ color: '#ef4444' }}>*</span> :
+                    </label>
                     <input 
                       type="email" 
                       value={guestForm.email}
@@ -505,7 +555,7 @@ export default function OnamEventRegistration() {
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                       <input 
                         type="text"
-                        placeholder="e.g. ABICTS"
+                        placeholder="Enter promo code"
                         value={promoCode}
                         onChange={(e) => setPromoCode(e.target.value)}
                         style={styles.promoInput}
@@ -533,7 +583,12 @@ export default function OnamEventRegistration() {
               disabled={submitting} 
               style={styles.payBtn}
             >
-              {submitting ? 'Processing Payment...' : `Payment Link (Gateway) - Pay ₹${netPayable}`}
+              {submitting 
+                ? 'Processing Registration...' 
+                : netPayable === 0 
+                  ? 'Complete Registration (Free ₹0)' 
+                  : `Payment Link (Gateway) - Pay ₹${netPayable}`
+              }
             </button>
           </div>
 

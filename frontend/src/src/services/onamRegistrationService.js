@@ -30,13 +30,10 @@ export const onamRegistrationService = {
       if (a.isMinor) {
         fee = 0;
       } else if (a.relation === 'self') {
-        fee = 500;
-      } else if (['spouse', 'mother', 'father', 'brother', 'sister'].includes(a.relation?.toLowerCase())) {
-        fee = 450;
-      } else if (['son', 'daughter', 'niece', 'nephew', 'kid', 'child'].includes(a.relation?.toLowerCase())) {
-        fee = 350;
+        fee = 300;
       } else {
-        fee = 450;
+        // Spouse, Children, Parents, Siblings, etc.
+        fee = 250;
       }
       total += fee;
       return { ...a, calculatedFee: fee };
@@ -52,8 +49,10 @@ export const onamRegistrationService = {
     const cleanCode = (code || '').trim().toUpperCase();
     if (!cleanCode) return { discount: 0, netPayable: baseAmount, valid: false };
 
-    if (cleanCode === 'ABICTS' || cleanCode === 'ONAM100') {
-      return { discount: baseAmount, netPayable: 0, valid: true, code: cleanCode };
+    if (cleanCode === 'SDZEN' || cleanCode === 'ABICTS' || cleanCode === 'ONAM100') {
+      return { discount: 750, netPayable: Math.max(0, baseAmount - 750), valid: true, code: cleanCode };
+    } else if (cleanCode === 'SD500') {
+      return { discount: 500, netPayable: Math.max(0, baseAmount - 500), valid: true, code: cleanCode };
     } else if (cleanCode === 'ONAM50') {
       const discount = Math.round(baseAmount * 0.5);
       return { discount, netPayable: baseAmount - discount, valid: true, code: cleanCode };

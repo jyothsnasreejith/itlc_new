@@ -15,7 +15,7 @@ export function useOnamRegistration() {
   });
 
   const [attendees, setAttendees] = useState([
-    { id: 1, name: '', relation: 'self', isMinor: false, amount: 500 }
+    { id: 1, name: '', relation: 'self', isMinor: false, amount: 300 }
   ]);
 
   // Guest form state
