@@ -27,6 +27,8 @@ import AdminSpinWheel from './pages/AdminSpinWheel'
 import AdminSpinWheelFullscreen from './pages/AdminSpinWheelFullscreen'
 import EventAttendingPoster from './pages/EventAttendingPoster'
 
+import OnamEventRegistration from './pages/OnamEventRegistration'
+
 function RootRedirect() {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
   const isLoggedIn = !!user
@@ -59,6 +61,8 @@ function App() {
       <Route path="/login" element={<RootRedirect />} />
 
       {/* Public event registration/invite flow & poster routes */}
+      <Route path="/onam-registration" element={<OnamEventRegistration />} />
+      <Route path="/public/onam-registration" element={<OnamEventRegistration />} />
       <Route path="/event/:id" element={<EventDetailsRegistration />} />
       <Route path="/public/event/:id" element={<EventDetailsRegistration />} />
       <Route path="/event/:id/poster" element={<EventAttendingPoster />} />
