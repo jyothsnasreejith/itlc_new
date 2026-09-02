@@ -31,6 +31,10 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+import onamRoutes from './src/routes/onamRoutes.js';
+app.use('/api/onam-registration', onamRoutes);
+
+
 // Ensure uploads folder exists (skip in serverless environments to prevent EROFS errors)
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!isServerless && !fs.existsSync(uploadsDir)) {
@@ -765,6 +769,22 @@ app.post('/api/query', async (req, res) => {
       // B. Build query for INSERT
       else if (action === 'insert') {
         const rawInsertRows = Array.isArray(data) ? data : [data];
+        
+        // Auto-create table if missing
+        try {
+          await connection.query(`SELECT 1 FROM \`${table}\` LIMIT 1`);
+        } catch (tableNotExistErr) {
+          if (tableNotExistErr.code === 'ER_NO_SUCH_TABLE') {
+            console.log(`⚡ Auto-creating missing MySQL table \`${table}\`...`);
+            await connection.query(`
+              CREATE TABLE IF NOT EXISTS \`${table}\` (
+                \`id\` VARCHAR(191) NOT NULL PRIMARY KEY,
+                \`created_at\` DATETIME DEFAULT CURRENT_TIMESTAMP
+              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            `);
+          }
+        }
+
         const sanitizedData = await ensureColumns(rawInsertRows);
         const insertRows = Array.isArray(sanitizedData) ? sanitizedData : [sanitizedData];
         const insertedResults = [];

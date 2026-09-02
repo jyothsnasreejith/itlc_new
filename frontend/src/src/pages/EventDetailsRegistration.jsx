@@ -234,7 +234,8 @@ export default function EventDetailsRegistration() {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata'
     })
   }
 

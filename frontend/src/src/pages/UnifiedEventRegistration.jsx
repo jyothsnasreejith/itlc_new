@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { formatErrorMessage } from '../utils/errorHandler'
 import BottomNav from '../components/BottomNav'
 
 export default function UnifiedEventRegistration() {
@@ -98,7 +99,7 @@ export default function UnifiedEventRegistration() {
     setToast({ show: true, message, type })
     setTimeout(() => {
       setToast({ show: false, message: '', type: 'error' })
-    }, 2800)
+    }, 6000)
   }
 
   // Member form handlers
@@ -292,7 +293,7 @@ export default function UnifiedEventRegistration() {
       navigate(`/thanks?type=membership&source=app`)
     } catch (error) {
       console.error('Error submitting form:', error)
-      showToast('Error submitting application. Please try again.')
+      showToast(formatErrorMessage(error, 'Error submitting application. Please try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -379,7 +380,7 @@ export default function UnifiedEventRegistration() {
       navigate(`/thanks?type=event&source=app`)
     } catch (error) {
       console.error('Error creating event registration:', error)
-      showToast('Error submitting registration. Please try again.')
+      showToast(formatErrorMessage(error, 'Error submitting registration. Please try again.'))
     } finally {
       setSubmitting(false)
     }

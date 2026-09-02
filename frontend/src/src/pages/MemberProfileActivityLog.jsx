@@ -708,7 +708,8 @@ export default function MemberProfileActivityLog() {
                       {new Date(member?.created_at).toLocaleDateString('en-US', { 
                         year: 'numeric', 
                         month: 'long', 
-                        day: 'numeric' 
+                        day: 'numeric',
+                        timeZone: 'Asia/Kolkata' 
                       })}
                     </span>
                   </div>
@@ -803,7 +804,7 @@ export default function MemberProfileActivityLog() {
                     </p>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                       <span className="material-symbols-outlined text-xs align-middle">schedule</span>
-                      Checked in: {new Date(activity.checked_in_at).toLocaleString()}
+                      Checked in: {new Date(activity.checked_in_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                     </p>
                     <div className="mt-2 px-2.5 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold rounded w-fit uppercase">
                       ✓ Attended
@@ -867,7 +868,8 @@ export default function MemberProfileActivityLog() {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
-                          minute: '2-digit'
+                          minute: '2-digit',
+                          timeZone: 'Asia/Kolkata'
                         })}
                       </p>
                     </div>

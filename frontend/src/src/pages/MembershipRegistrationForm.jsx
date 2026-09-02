@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { memberService } from '../services/memberService'
+import { formatErrorMessage } from '../utils/errorHandler'
 import BottomNav from '../components/BottomNav'
 
 export default function MembershipRegistrationForm() {
@@ -78,7 +79,7 @@ export default function MembershipRegistrationForm() {
     setToast({ show: true, message, type })
     setTimeout(() => {
       setToast({ show: false, message: '', type: 'error' })
-    }, 2800)
+    }, 6000)
   }
 
   const handleImageUpload = (e) => {
@@ -170,7 +171,7 @@ export default function MembershipRegistrationForm() {
       navigate(`/thanks?type=membership&source=${source}`)
     } catch (error) {
       console.error('Error submitting form:', error)
-      showToast('Error submitting application. Please try again.')
+      showToast(formatErrorMessage(error, 'Error submitting application. Please try again.'))
     } finally {
       setLoading(false)
     }

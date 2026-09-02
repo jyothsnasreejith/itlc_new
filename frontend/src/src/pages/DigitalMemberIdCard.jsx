@@ -156,7 +156,7 @@ export default function DigitalMemberIdCard() {
                   <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">Joined</p>
                 </div>
                 <p className="text-slate-900 dark:text-white text-sm font-semibold text-right">
-                  {member?.joined_date || (member?.created_at ? new Date(member.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A')}
+                  {member?.joined_date || (member?.created_at ? new Date(member.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' }) : 'N/A')}
                 </p>
               </div>
               <div className="flex justify-between items-center py-2.5 border-b border-slate-200 dark:border-slate-700">

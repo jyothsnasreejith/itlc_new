@@ -192,7 +192,7 @@ export default function AdminEventRegistrations() {
 
   const formatTime = (timestamp) => {
     if (!timestamp) return ''
-    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   }
 
   const filterPeople = (people) => {
@@ -277,7 +277,7 @@ export default function AdminEventRegistrations() {
       const paymentStatus = r.payment_status ? r.payment_status.toUpperCase() : 'UNPAID'
       const paymentAmount = r.payment_amount || 0
       const paymentId = r.payment_id || 'N/A'
-      const registeredAt = r.created_at ? new Date(r.created_at).toLocaleString() : 'N/A'
+      const registeredAt = r.created_at ? new Date(r.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'
 
       return [
         displayName || 'N/A',
@@ -641,6 +641,7 @@ export default function AdminEventRegistrations() {
               const isNonMember = !registration.member_id
               const displayName = isNonMember ? registration.guest_name : registration.member?.full_name
               const displayDesignation = isNonMember ? registration.guest_designation : registration.member?.designation
+              const displayCompany = isNonMember ? registration.guest_company : (registration.member?.company || registration.member?.company_name)
               return (
                 <div
                   key={registration.id}
@@ -653,15 +654,22 @@ export default function AdminEventRegistrations() {
                         {displayName?.charAt(0)?.toUpperCase() || 'G'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-base font-bold leading-none truncate">{displayName || 'Unknown'}</p>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-base font-bold leading-tight text-slate-900 dark:text-white truncate">{displayName || 'Unknown'}</p>
                           {isNonMember && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex-shrink-0">NON-MEMBER</span>
                           )}
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs font-medium truncate">
-                          {displayDesignation || (isNonMember ? 'Non-Member' : 'Member')}
-                        </p>
+                        {displayDesignation && (
+                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 leading-snug truncate">
+                            {displayDesignation}
+                          </p>
+                        )}
+                        {displayCompany && (
+                          <p className="text-[11px] font-medium text-primary dark:text-blue-400 leading-snug truncate">
+                            {displayCompany}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 ml-2 flex-shrink-0">
@@ -761,7 +769,7 @@ export default function AdminEventRegistrations() {
                     <div className="flex items-center gap-2 text-slate-505 dark:text-slate-500 text-[11px] mt-1 pt-2 border-t border-slate-200 dark:border-slate-700">
                       <span className="material-symbols-outlined text-xs">schedule</span>
                       <span>Registered: {new Date(registration.created_at).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata'
                       })}</span>
                     </div>
                   </div>

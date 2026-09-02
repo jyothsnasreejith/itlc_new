@@ -75,3 +75,28 @@ body {
 .qr-box {
   box-shadow: 0 0 0 4000px rgba(16, 24, 34, 0.7);
 }
+
+/* Onam Registration Mobile Responsiveness */
+@media (max-width: 640px) {
+  .onam-form-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .onam-label {
+    width: 100% !important;
+    margin-bottom: 4px !important;
+  }
+  .onam-guest-split {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .onam-type-box {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  .onam-btn-group {
+    flex-direction: column !important;
+  }
+}
+

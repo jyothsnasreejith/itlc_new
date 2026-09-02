@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { formatErrorMessage } from '../utils/errorHandler'
 
 const DEFAULT_EVENT_IMAGE = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80'
 const DEFAULT_PAGE_TITLE = 'IT Leaders Community (ITLC)'
@@ -100,7 +101,7 @@ export default function EventRegistrationConfirmation() {
     setToast({ show: true, message, type })
     setTimeout(() => {
       setToast({ show: false, message: '', type: 'error' })
-    }, 2800)
+    }, 6000)
   }
 
   // Fetch event on mount
@@ -472,7 +473,7 @@ export default function EventRegistrationConfirmation() {
     } catch (error) {
       console.error('Error updating registration:', error)
       if (!isAutoAction) {
-        showToast('Error processing your response. Please try again.')
+        showToast(formatErrorMessage(error, 'Error processing your response. Please try again.'))
       }
     } finally {
       setProcessing(false)
@@ -485,7 +486,8 @@ export default function EventRegistrationConfirmation() {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata'
     })
   }
 

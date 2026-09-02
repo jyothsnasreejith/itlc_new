@@ -230,7 +230,7 @@ export default function EventAttendanceScanner() {
             success: false,
             message: 'Already Checked Out',
             name: registration.member.full_name,
-            detail: `Checked out at ${new Date(existing.checked_out_at).toLocaleTimeString()} (Gift Claimed: ${existing.gift_claimed === 'yes' ? 'Yes' : 'No'})`,
+            detail: `Checked out at ${new Date(existing.checked_out_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} (Gift Claimed: ${existing.gift_claimed === 'yes' ? 'Yes' : 'No'})`,
             memberId: memberId,
             memberNumber: memberNumber,
             member: registration.member
@@ -488,9 +488,10 @@ export default function EventAttendanceScanner() {
                     </div>
                   </div>
                   <div className="text-xs text-slate-400">
-                    {new Date(attendance.checked_in_at).toLocaleTimeString([], { 
+                    {new Date(attendance.checked_in_at).toLocaleTimeString('en-IN', { 
                       hour: '2-digit', 
-                      minute: '2-digit' 
+                      minute: '2-digit',
+                      timeZone: 'Asia/Kolkata' 
                     })}
                   </div>
                   <span className="material-symbols-outlined text-green-500 text-sm">check_circle</span>
@@ -590,7 +591,7 @@ export default function EventAttendanceScanner() {
                         Check-Out Prompt
                       </h3>
                       <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        Already checked in at {new Date(scanResult.checkedInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                        Already checked in at {new Date(scanResult.checkedInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}.
                       </p>
                     </div>
                   </div>
