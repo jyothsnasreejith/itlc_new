@@ -9,7 +9,7 @@ export const memberRepository = {
   async findApprovedByPhone(phone) {
     const cleanPhone = String(phone).replace(/\D/g, '');
     const [rows] = await pool.query(
-      `SELECT id, email, full_name, phone_number, login_pin 
+      `SELECT id, email, full_name, phone_number, login_pin, company, designation
        FROM members 
        WHERE (phone_number = ? OR phone_number = ? OR phone_number = ?) AND status = 'approved' 
        LIMIT 1`,

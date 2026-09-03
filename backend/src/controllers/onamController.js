@@ -24,7 +24,9 @@ export async function verifyMemberPhoneHandler(req, res, next) {
         id: member.id,
         full_name: member.full_name,
         email: member.email,
-        phone_number: member.phone_number
+        phone_number: member.phone_number,
+        company: member.company || '',
+        designation: member.designation || ''
       }
     });
   } catch (err) {
