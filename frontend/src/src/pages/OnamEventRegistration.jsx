@@ -210,12 +210,14 @@ export default function OnamEventRegistration() {
 
   const shareWhatsApp = () => {
     if (!ticketData) return;
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(ticketData.qrValue)}`;
     const text = `🎉 *ITLC Onam Celebration 2026 Ticket* 🎉\n\n` +
       `Ticket ID: *${ticketData.registrationId}*\n` +
       `Name: ${ticketData.name}\n` +
       `Category: ${ticketData.type}\n` +
       `Attendees: ${ticketData.attendeesCount}\n` +
       `Status: Payment Confirmed (₹${ticketData.amount})\n\n` +
+      `📌 *View / Scan Ticket QR Code:* \n${qrImageUrl}\n\n` +
       `Present this ticket QR code at the event entrance!`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -236,6 +238,103 @@ export default function OnamEventRegistration() {
     } catch (err) {
       console.error('Download QR failed:', err);
       window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(ticketData.qrValue)}`, '_blank');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      setErrorMessage('');
+      let query = supabase.from('onam_registrations').select('*');
+      if (attendeeType === 'member') {
+        query = query.eq('attendee_type', 'member');
+      } else {
+        query = query.eq('attendee_type', 'guest');
+        if (guestCategory) {
+          query = query.eq('guest_category', guestCategory);
+        }
+      }
+
+      const { data: registrations, error } = await query;
+      if (error) throw error;
+
+      if (!registrations || registrations.length === 0) {
+        const filterDesc = attendeeType === 'member' ? 'ITLC Member' : `Guest (${guestCategory})`;
+        setErrorMessage(`No registration records found for ${filterDesc} to export.`);
+        return;
+      }
+
+      const regIds = registrations.map(r => r.id);
+      const { data: attendeesData } = await supabase
+        .from('onam_attendees')
+        .select('*')
+        .in('registration_id', regIds);
+
+      const attendeesMap = {};
+      attendeesData?.forEach(att => {
+        if (!attendeesMap[att.registration_id]) {
+          attendeesMap[att.registration_id] = [];
+        }
+        attendeesMap[att.registration_id].push(att);
+      });
+
+      const headers = [
+        'Registration ID',
+        'Attendee Type',
+        'Guest Category',
+        'Primary Member / Guest Name',
+        'Phone Number',
+        'Email',
+        'Company',
+        'Designation',
+        'Attendee Count',
+        'Total Fee (INR)',
+        'Payment ID',
+        'Promo Code',
+        'Attendee Breakdown (Name | Relation | Minor)',
+        'Created At'
+      ];
+
+      const rows = registrations.map(r => {
+        const attList = attendeesMap[r.id] || [];
+        const breakdownStr = attList.length > 0 
+          ? attList.map(a => `${a.name} (${a.relation}${a.is_minor ? ', Minor <5yrs' : ''})`).join(' ; ')
+          : (r.primary_name || 'N/A');
+
+        return [
+          r.id || '',
+          r.attendee_type || '',
+          r.guest_category || 'N/A',
+          r.primary_name || '',
+          r.phone_number || '',
+          r.email || '',
+          r.company || '',
+          r.designation || '',
+          r.num_attendees || (attList.length || 1),
+          r.total_amount || 0,
+          r.payment_id || '',
+          r.promo_code || 'None',
+          breakdownStr,
+          r.created_at ? new Date(r.created_at).toLocaleString('en-IN') : ''
+        ];
+      });
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = `Onam_Registrations_With_Attendees_${attendeeType === 'member' ? 'Members' : `Guest_${guestCategory.replace(/\s+/g, '_')}`}_${Date.now()}.csv`;
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error exporting registrations with attendees:', err);
+      setErrorMessage('Failed to export Excel report. Please try again.');
     }
   };
 
@@ -300,31 +399,54 @@ export default function OnamEventRegistration() {
         /* Form Flow Matching Handwritten Spec */
         <div style={styles.card}>
 
-          {/* Attendee Type Toggle Box */}
-          <div style={styles.typeBox} className="onam-type-box">
-            <div style={styles.boxLabel}>Attendee Type :</div>
-            <div style={styles.radioGroup}>
-              <label style={styles.radioLabel}>
-                <input 
-                  type="radio" 
-                  name="attendeeType" 
-                  value="member"
-                  checked={attendeeType === 'member'} 
-                  onChange={() => setAttendeeType('member')}
-                />
-                ITLC Member
-              </label>
-              <label style={styles.radioLabel}>
-                <input 
-                  type="radio" 
-                  name="attendeeType" 
-                  value="guest"
-                  checked={attendeeType === 'guest'} 
-                  onChange={() => setAttendeeType('guest')}
-                />
-                Guest
-              </label>
+          {/* Attendee Type Toggle Box & Export Excel */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={styles.typeBox} className="onam-type-box">
+              <div style={styles.boxLabel}>Attendee Type :</div>
+              <div style={styles.radioGroup}>
+                <label style={styles.radioLabel}>
+                  <input 
+                    type="radio" 
+                    name="attendeeType" 
+                    value="member"
+                    checked={attendeeType === 'member'} 
+                    onChange={() => setAttendeeType('member')}
+                  />
+                  ITLC Member
+                </label>
+                <label style={styles.radioLabel}>
+                  <input 
+                    type="radio" 
+                    name="attendeeType" 
+                    value="guest"
+                    checked={attendeeType === 'guest'} 
+                    onChange={() => setAttendeeType('guest')}
+                  />
+                  Guest
+                </label>
+              </div>
             </div>
+
+            <button 
+              type="button" 
+              onClick={handleExportExcel}
+              style={{
+                backgroundColor: '#10b981',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+            >
+              📊 Export to Excel
+            </button>
           </div>
 
           {errorMessage && (
