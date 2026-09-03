@@ -314,7 +314,7 @@ export default function OnamEventRegistration() {
           r.payment_id || '',
           r.promo_code || 'None',
           breakdownStr,
-          r.created_at ? new Date(r.created_at).toLocaleString('en-IN') : ''
+          r.created_at ? new Date(r.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : ''
         ];
       });
 
