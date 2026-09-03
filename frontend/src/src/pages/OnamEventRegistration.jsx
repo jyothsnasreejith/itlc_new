@@ -30,6 +30,14 @@ export default function OnamEventRegistration() {
   const [ticketData, setTicketData] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Admin auth modal for export
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminCreds, setAdminCreds] = useState({ username: '', password: '' });
+  const [adminAuthError, setAdminAuthError] = useState('');
+  const [adminAuthLoading, setAdminAuthLoading] = useState(false);
+  const [exportUnlocked, setExportUnlocked] = useState(false);
+  const [exportUnlockedAt, setExportUnlockedAt] = useState(null);
+
   const handleMobileSubmitVerify = (e) => {
     e.preventDefault();
     verifyMobileNumber();
@@ -75,6 +83,23 @@ export default function OnamEventRegistration() {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(guestForm.email.trim())) {
         setErrorMessage('Please enter a valid email address.');
+        return;
+      }
+    }
+
+    // ── Strict Fee Tamper & Bypass Guard ──
+    if (attendeeType === 'guest') {
+      if (netPayable === 0 && (!promoResult?.valid || promoResult?.discount < 750)) {
+        setErrorMessage('Invalid fee calculation. Guest registration fee is ₹750.');
+        return;
+      }
+      if (netPayable !== promoResult.netPayable) {
+        setErrorMessage('Fee mismatch detected. Please re-apply any promo code.');
+        return;
+      }
+    } else {
+      if (netPayable < 300) {
+        setErrorMessage('Member registration fee must be at least ₹300 for primary attendee.');
         return;
       }
     }
@@ -147,8 +172,13 @@ export default function OnamEventRegistration() {
         primary_name: payerName,
         phone_number: payerPhone,
         email: payerEmail,
-        company: attendeeType === 'member' ? 'ITLC Member' : guestForm.company,
-        designation: attendeeType === 'member' ? 'Member' : guestForm.designation,
+        // For members: fetch real company & designation from verified member profile
+        company: attendeeType === 'member'
+          ? (mobileVerificationState.memberData?.company || '')
+          : guestForm.company,
+        designation: attendeeType === 'member'
+          ? (mobileVerificationState.memberData?.designation || '')
+          : guestForm.designation,
         guest_category: attendeeType === 'guest' ? guestCategory : null,
         num_attendees: attendeeType === 'member' ? attendees.length : 1,
         total_payable: netPayable,
@@ -241,6 +271,52 @@ export default function OnamEventRegistration() {
     }
   };
 
+
+  // ── Admin-gated export ──────────────────────────────────────────────────
+  const ADMIN_SESSION_MINUTES = 30;
+
+  const handleExportClick = () => {
+    // Check if already unlocked within the session window
+    if (exportUnlocked && exportUnlockedAt) {
+      const elapsedMs = Date.now() - exportUnlockedAt;
+      if (elapsedMs < ADMIN_SESSION_MINUTES * 60 * 1000) {
+        handleExportExcel();
+        return;
+      }
+      // Session expired – re-auth
+      setExportUnlocked(false);
+      setExportUnlockedAt(null);
+    }
+    setAdminCreds({ username: '', password: '' });
+    setAdminAuthError('');
+    setShowAdminModal(true);
+  };
+
+  const verifyAdminAndExport = async () => {
+    setAdminAuthLoading(true);
+    setAdminAuthError('');
+    await new Promise(r => setTimeout(r, 400)); // brief UX delay
+    const savedUsers = localStorage.getItem('systemUsers');
+    const users = savedUsers ? JSON.parse(savedUsers) : [];
+    const match = users.find(
+      u =>
+        u.username.toLowerCase() === adminCreds.username.toLowerCase() &&
+        u.password === adminCreds.password &&
+        u.role === 'admin'
+    );
+    if (match) {
+      setExportUnlocked(true);
+      setExportUnlockedAt(Date.now());
+      setShowAdminModal(false);
+      setAdminCreds({ username: '', password: '' });
+      handleExportExcel();
+    } else {
+      setAdminAuthError('Invalid admin credentials. Access denied.');
+    }
+    setAdminAuthLoading(false);
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   const handleExportExcel = async () => {
     try {
       setErrorMessage('');
@@ -291,14 +367,28 @@ export default function OnamEventRegistration() {
         'Payment ID',
         'Promo Code',
         'Attendee Breakdown (Name | Relation | Minor)',
-        'Created At'
+        'Transaction Date & Time (IST)'
       ];
 
-      const rows = registrations.map(r => {
+      // ── Sort by created_at ascending (earliest registration first) ──
+      const sortedRegistrations = [...registrations].sort((a, b) => {
+        const da = a.created_at ? new Date(a.created_at) : new Date(0);
+        const db = b.created_at ? new Date(b.created_at) : new Date(0);
+        return da - db;
+      });
+
+      const rows = sortedRegistrations.map(r => {
         const attList = attendeesMap[r.id] || [];
         const breakdownStr = attList.length > 0 
           ? attList.map(a => `${a.name} (${a.relation}${a.is_minor ? ', Minor <5yrs' : ''})`).join(' ; ')
           : (r.primary_name || 'N/A');
+
+        // Company & Designation: real values from members table (backfilled for old rows)
+        const company     = r.company     || '';
+        const designation = r.designation || '';
+
+        // Total fee: column is stored as `total_payable` (fallback to total_amount for old rows)
+        const totalFee = r.total_payable ?? r.total_amount ?? 0;
 
         return [
           r.id || '',
@@ -307,10 +397,10 @@ export default function OnamEventRegistration() {
           r.primary_name || '',
           r.phone_number || '',
           r.email || '',
-          r.company || '',
-          r.designation || '',
+          company,
+          designation,
           r.num_attendees || (attList.length || 1),
-          r.total_amount || 0,
+          totalFee,
           r.payment_id || '',
           r.promo_code || 'None',
           breakdownStr,
@@ -326,7 +416,7 @@ export default function OnamEventRegistration() {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const filename = `Onam_Registrations_With_Attendees_${attendeeType === 'member' ? 'Members' : `Guest_${guestCategory.replace(/\s+/g, '_')}`}_${Date.now()}.csv`;
+      const filename = `Onam_Registrations_${attendeeType === 'member' ? 'Members' : `Guest_${guestCategory?.replace(/\s+/g, '_') || 'All'}`}_${Date.now()}.csv`;
       link.setAttribute('href', url);
       link.setAttribute('download', filename);
       document.body.appendChild(link);
@@ -339,6 +429,7 @@ export default function OnamEventRegistration() {
   };
 
   return (
+    <>
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.title}>Onam Celebration Registration</h1>
@@ -410,7 +501,12 @@ export default function OnamEventRegistration() {
                     name="attendeeType" 
                     value="member"
                     checked={attendeeType === 'member'} 
-                    onChange={() => setAttendeeType('member')}
+                    onChange={() => {
+                      setAttendeeType('member');
+                      // Reset promo when switching to Member tab
+                      setPromoCode('');
+                      setPromoResult({ discount: 0, netPayable: 750, valid: false });
+                    }}
                   />
                   ITLC Member
                 </label>
@@ -420,7 +516,12 @@ export default function OnamEventRegistration() {
                     name="attendeeType" 
                     value="guest"
                     checked={attendeeType === 'guest'} 
-                    onChange={() => setAttendeeType('guest')}
+                    onChange={() => {
+                      setAttendeeType('guest');
+                      // Reset promo when switching to Guest tab
+                      setPromoCode('');
+                      setPromoResult({ discount: 0, netPayable: 750, valid: false });
+                    }}
                   />
                   Guest
                 </label>
@@ -429,7 +530,7 @@ export default function OnamEventRegistration() {
 
             <button 
               type="button" 
-              onClick={handleExportExcel}
+              onClick={handleExportClick}
               style={{
                 backgroundColor: '#10b981',
                 color: '#ffffff',
@@ -445,7 +546,7 @@ export default function OnamEventRegistration() {
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
               }}
             >
-              📊 Export to Excel
+              🔒 Export to Excel
             </button>
           </div>
 
@@ -684,7 +785,13 @@ export default function OnamEventRegistration() {
                         type="text"
                         placeholder="Enter promo code"
                         value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value)}
+                        onChange={(e) => {
+                          setPromoCode(e.target.value);
+                          // Auto-reset discount when promo field is cleared
+                          if (!e.target.value.trim()) {
+                            setPromoResult({ discount: 0, netPayable: 750, valid: false });
+                          }
+                        }}
                         style={styles.promoInput}
                       />
                       <button type="button" onClick={handleApplyPromo} style={styles.applyBtn}>Apply</button>
@@ -722,6 +829,66 @@ export default function OnamEventRegistration() {
         </div>
       )}
     </div>
+
+      {/* ── Admin Login Modal for Export ── */}
+      {showAdminModal && (
+        <div style={modalStyles.overlay} onClick={(e) => { if (e.target === e.currentTarget) setShowAdminModal(false); }}>
+          <div style={modalStyles.box}>
+            <div style={modalStyles.iconWrap}>
+              <span style={{ fontSize: '32px' }}>🔐</span>
+            </div>
+            <h3 style={modalStyles.title}>Admin Authentication Required</h3>
+            <p style={modalStyles.subtitle}>Enter your admin credentials to export data.</p>
+
+            {adminAuthError && (
+              <div style={modalStyles.errorBox}>{adminAuthError}</div>
+            )}
+
+            <div style={modalStyles.field}>
+              <label style={modalStyles.label}>Username</label>
+              <input
+                type="text"
+                autoFocus
+                value={adminCreds.username}
+                onChange={(e) => setAdminCreds({ ...adminCreds, username: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && verifyAdminAndExport()}
+                placeholder="Admin username"
+                style={modalStyles.input}
+              />
+            </div>
+
+            <div style={modalStyles.field}>
+              <label style={modalStyles.label}>Password</label>
+              <input
+                type="password"
+                value={adminCreds.password}
+                onChange={(e) => setAdminCreds({ ...adminCreds, password: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && verifyAdminAndExport()}
+                placeholder="Admin password"
+                style={modalStyles.input}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                onClick={() => setShowAdminModal(false)}
+                disabled={adminAuthLoading}
+                style={modalStyles.cancelBtn}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={verifyAdminAndExport}
+                disabled={adminAuthLoading || !adminCreds.username || !adminCreds.password}
+                style={modalStyles.confirmBtn}
+              >
+                {adminAuthLoading ? 'Verifying...' : '🔓 Unlock & Export'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1061,5 +1228,98 @@ const styles = {
     marginBottom: '16px',
     fontSize: '14px',
     fontWeight: 'bold'
+  }
+};
+
+const modalStyles = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.55)',
+    backdropFilter: 'blur(4px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    padding: '16px'
+  },
+  box: {
+    background: '#ffffff',
+    borderRadius: '16px',
+    padding: '32px 28px',
+    width: '100%',
+    maxWidth: '400px',
+    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+    border: '1px solid #e5e7eb'
+  },
+  iconWrap: {
+    textAlign: 'center',
+    marginBottom: '12px'
+  },
+  title: {
+    margin: '0 0 6px 0',
+    fontSize: '18px',
+    fontWeight: '800',
+    color: '#111827',
+    textAlign: 'center'
+  },
+  subtitle: {
+    margin: '0 0 20px 0',
+    fontSize: '13px',
+    color: '#6b7280',
+    textAlign: 'center'
+  },
+  errorBox: {
+    background: '#fef2f2',
+    border: '1px solid #fca5a5',
+    color: '#b91c1c',
+    borderRadius: '8px',
+    padding: '10px 14px',
+    fontSize: '13px',
+    fontWeight: '600',
+    marginBottom: '16px'
+  },
+  field: {
+    marginBottom: '14px'
+  },
+  label: {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '6px'
+  },
+  input: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1.5px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s'
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: '11px',
+    background: '#f3f4f6',
+    color: '#374151',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+  confirmBtn: {
+    flex: 2,
+    padding: '11px',
+    background: '#059669',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(5,150,105,0.3)'
   }
 };

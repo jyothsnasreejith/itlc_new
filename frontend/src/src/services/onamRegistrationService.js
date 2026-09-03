@@ -27,10 +27,10 @@ export const onamRegistrationService = {
     let total = 0;
     const breakdown = attendees.map(a => {
       let fee = 0;
-      if (a.isMinor) {
+      if (a.relation === 'self') {
+        fee = 300; // Primary member (self) is never a minor (<5 yrs)
+      } else if (a.isMinor) {
         fee = 0;
-      } else if (a.relation === 'self') {
-        fee = 300;
       } else {
         // Spouse, Children, Parents, Siblings, etc.
         fee = 250;

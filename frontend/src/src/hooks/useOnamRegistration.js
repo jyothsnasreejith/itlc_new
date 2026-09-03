@@ -103,6 +103,8 @@ export function useOnamRegistration() {
   };
 
   const updateAttendee = (index, field, value) => {
+    // Primary member row (index 0) cannot be altered for relation or minor status
+    if (index === 0 && (field === 'isMinor' || field === 'relation')) return;
     setAttendees(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
