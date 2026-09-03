@@ -16,7 +16,9 @@ const pool = mysql.createPool({
   port: parseInt(process.env.DB_PORT || '3306'),
   waitForConnections: true,
   connectionLimit: 3, // Lowered from 10 to prevent exceeding cPanel max_user_connections limit
-  queueLimit: 0
+  queueLimit: 0,
+  timezone: '+05:30', // Enforce Indian Standard Time (IST) for database session
+  dateStrings: true   // Return raw date strings without UTC conversions
 });
 
 // Test connection
