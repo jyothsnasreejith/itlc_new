@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { memberService } from '../services/memberService'
 import BottomNav from '../components/BottomNav'
 
 const PAGE_SIZE = 20
@@ -21,9 +22,12 @@ export default function AdminMembershipRequests() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
 
   const loaderRef = useRef(null)
   const searchDebounceRef = useRef(null)
+  const exportDropdownRef = useRef(null)
 
   // Debounce search input
   useEffect(() => {
@@ -54,10 +58,13 @@ export default function AdminMembershipRequests() {
       if (showSortDropdown && !event.target.closest('.sort-dropdown-container')) {
         setShowSortDropdown(false)
       }
+      if (showExportDropdown && exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
+        setShowExportDropdown(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showSortDropdown])
+  }, [showSortDropdown, showExportDropdown])
 
   // Infinite scroll observer — only for approved tab
   useEffect(() => {
@@ -89,7 +96,7 @@ export default function AdminMembershipRequests() {
         if (debouncedSearch.trim()) {
           const q = debouncedSearch.trim()
           query = query.or(
-            `full_name.ilike.%${q}%,company.ilike.%${q}%,phone_number.ilike.%${q}%,designation.ilike.%${q}%`
+            `full_name.ilike.%${q}%,company.ilike.%${q}%,phone_number.ilike.%${q}%,designation.ilike.%${q}%,location.ilike.%${q}%,country_of_work.ilike.%${q}%`
           )
         }
 
@@ -186,6 +193,31 @@ export default function AdminMembershipRequests() {
     setSelectedMember(null)
   }
 
+  async function handleExportContacts(scope = 'all') {
+    setIsExporting(true)
+    setShowExportDropdown(false)
+    try {
+      const searchForExport = scope === 'filtered' ? debouncedSearch : ''
+      const membersToExport = await memberService.getApprovedMembersForExport(searchForExport)
+
+      if (!membersToExport || membersToExport.length === 0) {
+        alert('No approved member contacts found to export.')
+        return
+      }
+
+      const dateStr = new Date().toISOString().split('T')[0]
+      const filterSuffix = searchForExport.trim() ? '-filtered' : ''
+      const filename = `itlc-approved-members${filterSuffix}-${dateStr}.csv`
+
+      memberService.exportMembersToCSV(membersToExport, filename)
+    } catch (err) {
+      console.error('Error exporting contacts:', err)
+      alert(err.message || 'Failed to export contacts')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   // Sort (client-side for all tabs)
   const sortRequests = (requestsToSort) => {
     const sorted = [...requestsToSort]
@@ -222,7 +254,9 @@ export default function AdminMembershipRequests() {
       (request.full_name || '').toLowerCase().includes(query) ||
       (request.company || '').toLowerCase().includes(query) ||
       (request.phone_number || '').toLowerCase().includes(query) ||
-      (request.designation || '').toLowerCase().includes(query)
+      (request.designation || '').toLowerCase().includes(query) ||
+      (request.location || '').toLowerCase().includes(query) ||
+      (request.country_of_work || '').toLowerCase().includes(query)
     )
   }
 
@@ -255,7 +289,7 @@ export default function AdminMembershipRequests() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by name, company, phone, designation..."
+                  placeholder="Search by name, company, phone, designation, location..."
                   className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                   autoFocus
                 />
@@ -362,15 +396,81 @@ export default function AdminMembershipRequests() {
               </p>
             )}
           </div>
-          <div className="relative sort-dropdown-container">
-            <button
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
-            >
-              <span className="material-symbols-outlined text-lg">sort</span>
-              <span>{getSortLabel()}</span>
-              <span className="material-symbols-outlined text-lg">{showSortDropdown ? 'expand_less' : 'expand_more'}</span>
-            </button>
+          <div className="flex items-center gap-2">
+            {/* Contact Export Button — Approved Tab Only */}
+            {activeTab === 'approved' && (
+              <div className="relative" ref={exportDropdownRef}>
+                {debouncedSearch.trim() ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowExportDropdown(!showExportDropdown)}
+                      disabled={isExporting}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-sm font-semibold rounded-lg border border-emerald-200 dark:border-emerald-800 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                      title="Export options"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        {isExporting ? 'hourglass_empty' : 'table_view'}
+                      </span>
+                      <span>{isExporting ? 'Exporting...' : 'Export Contacts'}</span>
+                      <span className="material-symbols-outlined text-base">
+                        {showExportDropdown ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </button>
+
+                    {showExportDropdown && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                        <div className="px-3 py-1 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800 mb-1">
+                          Export Contacts
+                        </div>
+                        <button
+                          onClick={() => handleExportContacts('filtered')}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 flex items-center justify-between transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-base text-emerald-600">filter_list</span>
+                            <span>Matching Search</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => handleExportContacts('all')}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-base text-slate-500">group</span>
+                            <span>All Approved</span>
+                          </div>
+                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 font-bold">
+                            {stats.approved}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleExportContacts('all')}
+                    disabled={isExporting}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-sm font-semibold rounded-lg border border-emerald-200 dark:border-emerald-800 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                    title={`Export all ${stats.approved} approved member contacts to Excel / CSV`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      {isExporting ? 'hourglass_empty' : 'table_view'}
+                    </span>
+                    <span>{isExporting ? 'Exporting...' : `Export Contacts (${stats.approved})`}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="relative sort-dropdown-container">
+              <button
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+              >
+                <span className="material-symbols-outlined text-lg">sort</span>
+                <span>{getSortLabel()}</span>
+                <span className="material-symbols-outlined text-lg">{showSortDropdown ? 'expand_less' : 'expand_more'}</span>
+              </button>
 
             {showSortDropdown && (
               <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 py-2 z-50">
@@ -444,6 +544,7 @@ export default function AdminMembershipRequests() {
             )}
           </div>
         </div>
+      </div>
 
         {/* Request List Items */}
         <div className="flex flex-col gap-1 px-4 md:px-6 max-w-7xl mx-auto">
@@ -476,23 +577,31 @@ export default function AdminMembershipRequests() {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-col flex-1">
-                      <p className="text-base font-bold leading-tight">{request.full_name}</p>
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <p className="text-base font-bold leading-tight truncate">{request.full_name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-tighter">
                           {request.designation || 'N/A'}
                         </p>
                         {request.company && (
                           <>
                             <span className="text-slate-400 dark:text-slate-600 text-xs">•</span>
-                            <p className="text-slate-600 dark:text-slate-400 text-xs font-medium">
+                            <p className="text-slate-600 dark:text-slate-400 text-xs font-medium truncate">
                               {request.company}
                             </p>
                           </>
                         )}
                       </div>
+                      {(request.location || request.country_of_work) && (
+                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          <span className="material-symbols-outlined text-xs text-slate-400">location_on</span>
+                          <span className="truncate">
+                            {[request.location, request.country_of_work].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
                       {activeTab === 'approved' && (
-                        <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="flex items-center gap-1.5 mt-1">
                           <span className="material-symbols-outlined text-green-600 dark:text-green-500 text-xs">calendar_month</span>
                           <p className="text-green-600 dark:text-green-500 text-xs font-medium">
                             Joined {new Date(request.created_at).toLocaleDateString('en-US', {

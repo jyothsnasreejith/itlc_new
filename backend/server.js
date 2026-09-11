@@ -560,6 +560,7 @@ app.post('/api/query', async (req, res) => {
   try {
     const connection = await pool.getConnection();
     try {
+      await connection.query("SET time_zone = '+05:30'");
       let sql = '';
       const params = [];
 

@@ -21,6 +21,11 @@ const pool = mysql.createPool({
   dateStrings: true   // Return raw date strings without UTC conversions
 });
 
+// Enforce Indian Standard Time (IST) on MySQL server session level for every connection
+pool.pool.on('connection', (conn) => {
+  conn.query("SET time_zone = '+05:30'");
+});
+
 // Test connection
 try {
   const connection = await pool.getConnection();
