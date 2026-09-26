@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { eventService } from '../services/eventService'
+import { useGroups } from '../hooks/useGroups'
 import BottomNav from '../components/BottomNav'
 
 export default function EventsList() {
   const navigate = useNavigate()
+  const { groups } = useGroups()
   const [activeTab, setActiveTab] = useState('upcoming')
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,6 +15,8 @@ export default function EventsList() {
   const [shareMenuOpen, setShareMenuOpen] = useState(null)
   const [sendingEmails, setSendingEmails] = useState(false)
   const [selectedChapter, setSelectedChapter] = useState('all')
+  const [inviteTargetType, setInviteTargetType] = useState('group') // 'group' | 'chapter' | 'direct'
+  const [selectedGroupId, setSelectedGroupId] = useState('')
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [emailModalEvent, setEmailModalEvent] = useState(null)
   const [emailRecipient, setEmailRecipient] = useState('')
@@ -172,6 +176,12 @@ export default function EventsList() {
   const openEmailInviteModal = (event) => {
     setEmailModalEvent(event)
     setEmailRecipient('')
+    if (groups && groups.length > 0) {
+      setInviteTargetType('group')
+      if (!selectedGroupId) setSelectedGroupId(groups[0].id)
+    } else {
+      setInviteTargetType('chapter')
+    }
     setEmailModalOpen(true)
     setShareMenuOpen(null)
   }
@@ -183,10 +193,7 @@ export default function EventsList() {
     setEmailRecipient('')
   }
 
-  const handleEmailInvite = async (event, recipientInput = '') => {
-    const chapterText = selectedChapter === 'all' ? 'all chapters' : selectedChapter
-    const recipient = recipientInput.trim()
-
+  const handleEmailInvite = async (event) => {
     setSendingEmails(true)
     try {
       const localUser = JSON.parse(localStorage.getItem('user') || 'null')
@@ -198,25 +205,41 @@ export default function EventsList() {
         return
       }
 
-      // Call local backend Edge Function via custom client
-      const { data: result, error } = await supabase.functions.invoke('send-event-invites', {
-        body: {
-          eventId: event.id,
-          chapter: selectedChapter,
-          targetEmail: recipient && recipient.includes('@') ? recipient : null,
-          targetPhone: recipient && !recipient.includes('@') ? recipient : null,
+      let payload = { eventId: event.id }
+      let targetDesc = ''
+
+      if (inviteTargetType === 'group') {
+        if (!selectedGroupId) {
+          alert('Please select a group.')
+          setSendingEmails(false)
+          return
         }
-      })
+        const grp = groups.find(g => g.id === selectedGroupId)
+        payload.groupId = selectedGroupId
+        targetDesc = `members of the "${grp?.name || 'Selected'}" group`
+      } else if (inviteTargetType === 'chapter') {
+        const chapterText = selectedChapter === 'all' ? 'all chapters' : selectedChapter
+        payload.chapter = selectedChapter
+        targetDesc = `members from ${chapterText}`
+      } else {
+        const recipient = emailRecipient.trim()
+        if (!recipient) {
+          alert('Please enter an email or phone number.')
+          setSendingEmails(false)
+          return
+        }
+        if (recipient.includes('@')) {
+          payload.targetEmail = recipient
+        } else {
+          payload.targetPhone = recipient
+        }
+        targetDesc = recipient
+      }
 
-      if (error) throw error
+      const result = await eventService.sendEventInvites(payload)
 
-      const successText = recipient
-        ? `✅ Success! ${result.count} invitation email(s) sent to ${recipient}.`
-        : `✅ Success! ${result.count} invitation email(s) sent to members from ${chapterText}.`
-      alert(successText)
-      setSelectedChapter('all') // Reset chapter selection
+      alert(`✅ Success! ${result.count} invitation email(s) sent to ${targetDesc}.`)
       closeEmailInviteModal()
-      
     } catch (error) {
       console.error('Error sending invitations:', error)
       alert(`❌ Error: ${error.message || 'Failed to send invitations. Please try again.'}`)
@@ -657,71 +680,204 @@ export default function EventsList() {
             onClick={closeEmailInviteModal}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
-              <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Email Invitation</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{emailModalEvent.title}</p>
+            <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-xl">send</span>
+                    <span>Send Invitations</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{emailModalEvent.title}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeEmailInviteModal}
+                  className="size-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center transition-colors"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
               </div>
 
               <form
                 className="p-5 space-y-4"
                 onSubmit={(e) => {
                   e.preventDefault()
-                  handleEmailInvite(emailModalEvent, emailRecipient)
+                  handleEmailInvite(emailModalEvent)
                 }}
               >
+                {/* Target Type Selector */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                    Recipient (Optional)
+                    Send Invitation To:
                   </label>
-                  <input
-                    type="text"
-                    value={emailRecipient}
-                    onChange={(e) => setEmailRecipient(e.target.value)}
-                    placeholder="Phone or email for single invite"
-                    className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                    disabled={sendingEmails}
-                  />
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Leave empty to send to chapter selection.
-                  </p>
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setInviteTargetType('group')}
+                      className={`py-2 px-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                        inviteTargetType === 'group'
+                          ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">diversity_3</span>
+                      <span>Group</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInviteTargetType('chapter')}
+                      className={`py-2 px-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                        inviteTargetType === 'chapter'
+                          ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">location_city</span>
+                      <span>Chapter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInviteTargetType('direct')}
+                      className={`py-2 px-2 rounded-lg text-xs font-bold transition-all flex flex-col items-center gap-1 ${
+                        inviteTargetType === 'direct'
+                          ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">person</span>
+                      <span>Individual</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                    Select Chapter
-                  </label>
-                  <select
-                    value={selectedChapter}
-                    onChange={(e) => setSelectedChapter(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                    disabled={sendingEmails}
-                  >
-                    <option value="all">All Chapters</option>
-                    <option value="Kochi">Kochi</option>
-                    <option value="Thiruvananthapuram">Thiruvananthapuram</option>
-                    <option value="Kozhikode">Kozhikode</option>
-                    <option value="Bengaluru">Bengaluru</option>
-                    <option value="Other Indian Cities">Other Indian Cities</option>
-                    <option value="Overseas">Overseas</option>
-                  </select>
-                </div>
+                {/* Option 1: Select Member Group */}
+                {inviteTargetType === 'group' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Select Member Group
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeEmailInviteModal()
+                          navigate('/admin/groups')
+                        }}
+                        className="text-xs text-primary hover:underline font-semibold flex items-center gap-0.5"
+                      >
+                        <span className="material-symbols-outlined text-sm">settings</span>
+                        <span>Manage Groups</span>
+                      </button>
+                    </div>
+
+                    {groups.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
+                        <span className="material-symbols-outlined text-2xl text-amber-600 mb-1">group_off</span>
+                        <p className="text-xs text-amber-800 dark:text-amber-300 font-semibold">
+                          No member groups created yet
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closeEmailInviteModal()
+                            navigate('/admin/groups')
+                          }}
+                          className="mt-2 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors"
+                        >
+                          Create a Group Now
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          value={selectedGroupId || (groups[0]?.id || '')}
+                          onChange={(e) => setSelectedGroupId(e.target.value)}
+                          className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                          disabled={sendingEmails}
+                        >
+                          {groups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.member_count || 0} members)
+                            </option>
+                          ))}
+                        </select>
+                        {(() => {
+                          const currentGrp = groups.find(g => g.id === (selectedGroupId || groups[0]?.id))
+                          return currentGrp ? (
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <span className="size-2.5 rounded-full" style={{ backgroundColor: currentGrp.color || '#4f46e5' }} />
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">{currentGrp.name}</span>
+                              </span>
+                              <span className="font-bold text-primary">{currentGrp.member_count || 0} members will be invited</span>
+                            </div>
+                          ) : null
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Option 2: Select Chapter */}
+                {inviteTargetType === 'chapter' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Select Chapter
+                    </label>
+                    <select
+                      value={selectedChapter}
+                      onChange={(e) => setSelectedChapter(e.target.value)}
+                      className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                      disabled={sendingEmails}
+                    >
+                      <option value="all">All Chapters</option>
+                      <option value="Kochi">Kochi</option>
+                      <option value="Thiruvananthapuram">Thiruvananthapuram</option>
+                      <option value="Kozhikode">Kozhikode</option>
+                      <option value="Bengaluru">Bengaluru</option>
+                      <option value="Other Indian Cities">Other Indian Cities</option>
+                      <option value="Overseas">Overseas</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Option 3: Individual Recipient */}
+                {inviteTargetType === 'direct' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Recipient Email or Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={emailRecipient}
+                      onChange={(e) => setEmailRecipient(e.target.value)}
+                      placeholder="e.g. member@example.com or 9876543210"
+                      className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                      disabled={sendingEmails}
+                      required={inviteTargetType === 'direct'}
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Sends a direct personalized invitation link to this member.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"
                     onClick={closeEmailInviteModal}
                     disabled={sendingEmails}
-                    className="flex-1 h-10 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                    className="flex-1 h-10 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 text-sm font-semibold"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={sendingEmails}
-                    className="flex-1 h-10 rounded-lg bg-primary hover:bg-primary/90 text-white font-semibold transition-colors disabled:opacity-50"
+                    disabled={sendingEmails || (inviteTargetType === 'group' && groups.length === 0)}
+                    className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold transition-colors disabled:opacity-50 text-sm shadow-md shadow-primary/20 flex items-center justify-center gap-1.5"
                   >
-                    {sendingEmails ? 'Sending...' : 'Send Invite'}
+                    <span className="material-symbols-outlined text-lg">mail</span>
+                    <span>{sendingEmails ? 'Sending Invites...' : 'Send Invite'}</span>
                   </button>
                 </div>
               </form>

@@ -32,6 +32,7 @@ const PublicProfileUpdate = lazy(() => import('./pages/PublicProfileUpdate'))
 const AdminUserManagement = lazy(() => import('./pages/AdminUserManagement'))
 const AdminSpinWheel = lazy(() => import('./pages/AdminSpinWheel'))
 const AdminSpinWheelFullscreen = lazy(() => import('./pages/AdminSpinWheelFullscreen'))
+const AdminGroups = lazy(() => import('./pages/AdminGroups'))
 
 function RootRedirect() {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
@@ -40,6 +41,9 @@ function RootRedirect() {
   if (isLoggedIn) {
     if (user?.role === 'event_manager') {
       return <Navigate to="/manager/dashboard" replace />
+    }
+    if (user?.role === 'member') {
+      return <Navigate to="/member/id-card" replace />
     }
     return <Navigate to="/admin/dashboard" replace />
   }
@@ -52,6 +56,17 @@ function AdminProtectedRoute({ children }) {
   const isAdmin = user?.role === 'admin'
 
   if (!isAdmin) {
+    return <Navigate to="/login" replace />
+  }
+
+  return children
+}
+
+function MemberProtectedRoute({ children }) {
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  const isAuthorized = user && (user.role === 'member' || user.role === 'admin' || user.role === 'event_manager')
+
+  if (!isAuthorized) {
     return <Navigate to="/login" replace />
   }
 
@@ -86,18 +101,19 @@ function App() {
         <Route path="/membership-registration" element={<AdminProtectedRoute><MembershipRegistrationForm /></AdminProtectedRoute>} />
         <Route path="/public/membership" element={<MembershipRegistrationForm />} />
         <Route path="/public/profile-update" element={<PublicProfileUpdate />} />
-        <Route path="/update-profile" element={<AdminProtectedRoute><PublicProfileUpdate /></AdminProtectedRoute>} />
+        <Route path="/update-profile" element={<MemberProtectedRoute><PublicProfileUpdate /></MemberProtectedRoute>} />
         <Route path="/admin/dashboard" element={<AdminProtectedRoute><Dashboard /></AdminProtectedRoute>} />
         <Route path="/admin/create-event" element={<AdminProtectedRoute><AdminCreateNewEvent /></AdminProtectedRoute>} />
         <Route path="/admin/edit-event/:id" element={<AdminProtectedRoute><AdminEditEvent /></AdminProtectedRoute>} />
         <Route path="/admin/event-registrations/:id" element={<AdminProtectedRoute><AdminEventRegistrations /></AdminProtectedRoute>} />
         <Route path="/admin/membership-requests" element={<AdminProtectedRoute><AdminMembershipRequests /></AdminProtectedRoute>} />
         <Route path="/admin/users" element={<AdminProtectedRoute><AdminUserManagement /></AdminProtectedRoute>} />
+        <Route path="/admin/groups" element={<AdminProtectedRoute><AdminGroups /></AdminProtectedRoute>} />
         <Route path="/admin/spin-wheel" element={<AdminProtectedRoute><AdminSpinWheel /></AdminProtectedRoute>} />
         <Route path="/admin/spin-wheel/fullscreen" element={<AdminProtectedRoute><AdminSpinWheelFullscreen /></AdminProtectedRoute>} />
         <Route path="/manager/dashboard" element={<AdminProtectedRoute><EventManagerDashboard /></AdminProtectedRoute>} />
         <Route path="/manager/attendance/:eventId" element={<AdminProtectedRoute><EventManagerAttendance /></AdminProtectedRoute>} />
-        <Route path="/member/id-card" element={<AdminProtectedRoute><DigitalMemberIdCard /></AdminProtectedRoute>} />
+        <Route path="/member/id-card" element={<MemberProtectedRoute><DigitalMemberIdCard /></MemberProtectedRoute>} />
         <Route path="/scanner/:eventId" element={<AdminProtectedRoute><EventAttendanceScanner /></AdminProtectedRoute>} />
         <Route path="/admin/event-checkin-qr/:id" element={<AdminProtectedRoute><AdminEventCheckInQR /></AdminProtectedRoute>} />
         <Route path="/admin/event-attendance/:id" element={<AdminProtectedRoute><AdminEventAttendance /></AdminProtectedRoute>} />

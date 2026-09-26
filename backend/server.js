@@ -32,7 +32,18 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 import onamRoutes from './src/routes/onamRoutes.js';
+import groupRoutes from './src/routes/groupRoutes.js';
+import eventRoutes from './src/routes/eventRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
+import { forgotPinHandler, resetPinHandler } from './src/controllers/authController.js';
+import { initGroupsTables } from './src/scripts/initGroupsTable.js';
+
 app.use('/api/onam-registration', onamRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/auth', authRoutes);
+app.post('/api/functions/forgot-pin', forgotPinHandler);
+app.post('/api/functions/reset-pin', resetPinHandler);
 
 
 // Ensure uploads folder exists (skip in serverless environments to prevent EROFS errors)
@@ -350,100 +361,13 @@ app.post('/api/repair-images', async (req, res) => {
 });
 
 // 2. Mock Edge Function: forgot-pin
-app.post('/api/functions/forgot-pin', async (req, res) => {
-  try {
-    const { phoneNumber } = req.body;
+app.post('/api/functions/forgot-pin', forgotPinHandler);
 
-    if (!phoneNumber) {
-      return res.status(400).json({ success: false, message: 'Phone number is required' });
-    }
-
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
-
-    // Find member by phone number
-    const [members] = await pool.query(
-      `SELECT id, email, full_name, phone_number, login_pin 
-       FROM members 
-       WHERE (phone_number = ? OR phone_number = ? OR phone_number = ?) AND status = 'approved' 
-       LIMIT 1`,
-      [phoneNumber, cleanPhone, `+91${cleanPhone}`]
-    );
-
-    if (members.length === 0) {
-      return res.status(404).json({ success: false, message: 'Member not found or not approved' });
-    }
-
-    const member = members[0];
-    if (!member.email) {
-      return res.status(400).json({ success: false, message: 'No email address found for this member' });
-    }
-
-    // Generate 6 digit temporary pin
-    const tempPin = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-
-    // Update member record with reset pin
-    await pool.query(
-      'UPDATE members SET reset_pin = ?, reset_pin_expires_at = ? WHERE id = ?',
-      [tempPin, expiryTime, member.id]
-    );
-
-    // Send email via Mailtrap (or print to console if Mailtrap is not configured)
-    const mailtrapToken = process.env.MAILTRAP_TOKEN;
-    if (mailtrapToken) {
-      const senderEmail = process.env.MAILTRAP_SENDER_EMAIL || 'noreply@yourdomain.com';
-      const senderName = process.env.MAILTRAP_SENDER_NAME || 'ITLC Support Team';
-
-      const emailPayload = {
-        from: { email: senderEmail, name: senderName },
-        to: [{ email: member.email, name: member.full_name }],
-        subject: 'Your PIN Reset Code - ITLC Kerala',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
-            <div style="background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
-              <h2 style="color: #1a1a1a; border-bottom: 2px solid #e5e5e5; padding-bottom: 10px;">PIN Reset Code</h2>
-              <p>Hello ${member.full_name},</p>
-              <p>You have requested to reset your PIN. Here is your temporary reset code:</p>
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 4px; margin: 20px 0; font-family: monospace;">${tempPin}</div>
-              <p style="background-color: #fff3cd; color: #856404; padding: 15px; border-radius: 6px;"><strong>Warning:</strong> This code will expire in 15 minutes.</p>
-            </div>
-          </div>
-        `
-      };
-
-      const response = await fetch('https://send.api.mailtrap.io/api/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${mailtrapToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(emailPayload)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to send Mailtrap email:', errorText);
-      }
-    } else {
-      console.log(`[DEV MODE] Forgot PIN request for ${member.email}. Temp PIN is: ${tempPin}`);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'PIN reset code sent to your email',
-      emailSent: !!mailtrapToken
-    });
-
-  } catch (err) {
-    console.error('Forgot PIN error:', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 // 3. Mock Edge Function: send-event-invites
 app.post('/api/functions/send-event-invites', async (req, res) => {
   try {
-    const { eventId, chapter, targetEmail, targetPhone } = req.body;
+    const { eventId, chapter, targetEmail, targetPhone, groupId } = req.body;
 
     // Fetch event details
     const [events] = await pool.query('SELECT * FROM events WHERE id = ? LIMIT 1', [eventId]);
@@ -453,26 +377,38 @@ app.post('/api/functions/send-event-invites', async (req, res) => {
     const event = events[0];
 
     // Build member query
-    let queryStr = 'SELECT id, email, full_name, itlc_chapter_name FROM members WHERE status = "approved" AND email IS NOT NULL';
-    const params = [];
+    let members = [];
+    if (groupId) {
+      const [groupMembers] = await pool.query(`
+        SELECT m.id, m.email, m.full_name, m.itlc_chapter_name 
+        FROM members m
+        INNER JOIN group_members gm ON m.id = gm.member_id
+        WHERE gm.group_id = ? AND m.status = 'approved' AND m.email IS NOT NULL
+      `, [groupId]);
+      members = groupMembers;
+    } else {
+      let queryStr = 'SELECT id, email, full_name, itlc_chapter_name FROM members WHERE status = "approved" AND email IS NOT NULL';
+      const params = [];
 
-    if (targetEmail) {
-      queryStr += ' AND email = ?';
-      params.push(targetEmail);
+      if (targetEmail) {
+        queryStr += ' AND email = ?';
+        params.push(targetEmail);
+      }
+
+      if (targetPhone) {
+        const cleanPhone = String(targetPhone).replace(/\D/g, '');
+        queryStr += ' AND (phone_number = ? OR phone_number = ? OR phone_number = ?)';
+        params.push(targetPhone, cleanPhone, `+91${cleanPhone}`);
+      }
+
+      if (chapter && chapter !== 'all') {
+        queryStr += ' AND itlc_chapter_name = ?';
+        params.push(chapter);
+      }
+
+      const [rows] = await pool.query(queryStr, params);
+      members = rows;
     }
-
-    if (targetPhone) {
-      const cleanPhone = String(targetPhone).replace(/\D/g, '');
-      queryStr += ' AND (phone_number = ? OR phone_number = ? OR phone_number = ?)';
-      params.push(targetPhone, cleanPhone, `+91${cleanPhone}`);
-    }
-
-    if (chapter && chapter !== 'all') {
-      queryStr += ' AND itlc_chapter_name = ?';
-      params.push(chapter);
-    }
-
-    const [members] = await pool.query(queryStr, params);
 
     if (members.length === 0) {
       return res.status(400).json({ success: false, message: 'No members found for invitation criteria' });
@@ -1155,10 +1091,11 @@ app.post('/api/linkedin/share', async (req, res) => {
 });
 
 
-// Fallback error handler
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('API Error:', err.message || err);
+  const status = err.statusCode || err.status || 500;
+  res.status(status).json({ error: err.message || 'Something went wrong!' });
 });
 
 // Auto-repair profile images on startup
@@ -1350,6 +1287,7 @@ async function repairProfileImages() {
 
 app.listen(PORT, async () => {
   console.log(`ITLC Backend Server running on port ${PORT}`);
+  await initGroupsTables();
   if (!isServerless) {
     await repairProfileImages();
   } else {
