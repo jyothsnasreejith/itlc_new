@@ -130,5 +130,20 @@ export const eventService = {
 
     if (error) throw new Error(error.message || 'Failed to register for event');
     return data && data.length > 0 ? data[0] : null;
+  },
+
+  async sendEventInvites({ eventId, chapter, targetEmail, targetPhone, groupId }) {
+    const { data, error } = await supabase.functions.invoke('send-event-invites', {
+      body: {
+        eventId,
+        chapter,
+        targetEmail,
+        targetPhone,
+        groupId
+      }
+    });
+
+    if (error) throw error;
+    return data;
   }
 };

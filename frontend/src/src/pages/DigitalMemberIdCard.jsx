@@ -19,14 +19,18 @@ export default function DigitalMemberIdCard() {
 
   async function fetchMemberData() {
     try {
-      // In a real app, you'd get the current user's ID from auth
-      // For now, we'll fetch the first approved member
-      const { data, error } = await supabase
-        .from('members')
-        .select('*')
-        .eq('status', 'approved')
-        .limit(1)
-        .single()
+      const localUser = JSON.parse(localStorage.getItem('user') || 'null')
+      let query = supabase.from('members').select('*')
+
+      if (localUser?.id) {
+        query = query.eq('id', localUser.id)
+      } else if (localUser?.phone) {
+        query = query.eq('phone_number', localUser.phone)
+      } else {
+        query = query.eq('status', 'approved')
+      }
+
+      const { data, error } = await query.limit(1).single()
 
       if (error) throw error
       setMember(data)

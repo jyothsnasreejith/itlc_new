@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { eventService } from '../services/eventService'
+import { useGroups } from '../hooks/useGroups'
 import BottomNav from '../components/BottomNav'
 
 export default function AdminCreateNewEvent() {
   const navigate = useNavigate()
+  const { groups } = useGroups()
   const [formData, setFormData] = useState({
     eventName: '',
     description: '',
@@ -17,6 +20,8 @@ export default function AdminCreateNewEvent() {
     autoShare: true,
     gift: 'no'
   })
+  const [inviteGroup, setInviteGroup] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState('')
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -84,7 +89,24 @@ export default function AdminCreateNewEvent() {
       }
 
       console.log('Event created:', data)
-      alert('Event created successfully!')
+
+      // If direct group invitation is chosen, dispatch invitations immediately
+      if (inviteGroup && selectedGroupId && data && data.length > 0) {
+        try {
+          const inviteRes = await eventService.sendEventInvites({
+            eventId: data[0].id,
+            groupId: selectedGroupId
+          })
+          const grp = groups.find(g => g.id === selectedGroupId)
+          alert(`Event created successfully! Sent ${inviteRes?.count || 0} invitation email(s) to "${grp?.name || 'Group'}".`)
+        } catch (inviteErr) {
+          console.warn('Group invitations failed:', inviteErr)
+          alert(`Event created, but failed to send group invitations: ${inviteErr.message}`)
+        }
+      } else {
+        alert('Event created successfully!')
+      }
+
       navigate('/events')
     } catch (error) {
       console.error('Error creating event:', error)
@@ -326,7 +348,7 @@ export default function AdminCreateNewEvent() {
                 Auto-share with members
               </p>
               <p className="text-slate-500 dark:text-slate-400 text-xs">
-                Sends an email invitation immediately
+                Sends an email invitation immediately to chapter members
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -339,6 +361,74 @@ export default function AdminCreateNewEvent() {
               />
               <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
             </label>
+          </div>
+
+          {/* Direct Invite to Member Group */}
+          <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-indigo-600 dark:text-indigo-400 text-2xl">
+                  diversity_3
+                </span>
+                <div>
+                  <p className="text-slate-900 dark:text-slate-100 text-sm font-bold leading-tight">
+                    Direct Invite to Group
+                  </p>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs">
+                    Send invitation to a specific member group
+                  </p>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={inviteGroup}
+                  onChange={(e) => {
+                    setInviteGroup(e.target.checked)
+                    if (e.target.checked && groups.length > 0 && !selectedGroupId) {
+                      setSelectedGroupId(groups[0].id)
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {inviteGroup && (
+              <div className="pt-2 border-t border-indigo-200/60 dark:border-indigo-800/60 space-y-2">
+                {groups.length === 0 ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    No member groups created yet. You can create groups under{' '}
+                    <span
+                      onClick={() => navigate('/admin/groups')}
+                      className="font-bold underline cursor-pointer text-primary"
+                    >
+                      Member Groups
+                    </span>
+                    .
+                  </p>
+                ) : (
+                  <>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                      Select Group to Invite
+                    </label>
+                    <select
+                      value={selectedGroupId || groups[0]?.id}
+                      onChange={(e) => setSelectedGroupId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    >
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name} ({g.member_count || 0} members)
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="pt-4 pb-8">

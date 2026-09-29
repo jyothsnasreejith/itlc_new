@@ -250,13 +250,20 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <section>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <button
               onClick={() => navigate('/admin/create-event')}
               className="bg-primary text-white rounded-xl p-4 flex flex-col items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl transition-shadow"
             >
               <span className="material-symbols-outlined text-3xl">add_circle</span>
               <span className="text-sm font-semibold">Create Event</span>
+            </button>
+            <button
+              onClick={() => navigate('/admin/groups')}
+              className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 hover:border-primary hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-3xl text-indigo-500">diversity_3</span>
+              <span className="text-sm font-semibold">Member Groups</span>
             </button>
             <button
               onClick={() => navigate('/admin/membership-requests')}
@@ -278,6 +285,13 @@ export default function Dashboard() {
             >
               <span className="material-symbols-outlined text-3xl">person_add</span>
               <span className="text-sm font-semibold">Add Member</span>
+            </button>
+            <button
+              onClick={() => navigate('/admin/spin-wheel')}
+              className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-3xl text-amber-500">casino</span>
+              <span className="text-sm font-semibold">Lucky Draw</span>
             </button>
           </div>
         </section>

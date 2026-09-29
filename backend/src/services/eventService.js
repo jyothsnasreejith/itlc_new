@@ -2,7 +2,7 @@ import { eventRepository } from '../repositories/eventRepository.js';
 import { memberRepository } from '../repositories/memberRepository.js';
 
 export const eventService = {
-  async sendInvites({ eventId, chapter, targetEmail, targetPhone }) {
+  async sendInvites({ eventId, chapter, targetEmail, targetPhone, groupId }) {
     const event = await eventRepository.findById(eventId);
     if (!event) {
       const err = new Error('Event not found');
@@ -10,7 +10,7 @@ export const eventService = {
       throw err;
     }
 
-    const members = await memberRepository.findMembersForInvite({ targetEmail, targetPhone, chapter });
+    const members = await memberRepository.findMembersForInvite({ targetEmail, targetPhone, chapter, groupId });
     if (members.length === 0) {
       const err = new Error('No members found for invitation criteria');
       err.statusCode = 400;

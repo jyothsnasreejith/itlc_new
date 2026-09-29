@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { authService } from '../services/authService'
 
 export default function PublicProfileUpdate() {
   const [step, setStep] = useState('verify') // 'verify', 'verify-pin', 'forgot-pin', 'reset-pin', or 'edit'
@@ -98,14 +99,10 @@ export default function PublicProfileUpdate() {
     setPinLoading(true)
 
     try {
-      const { data, error } = await supabase.functions.invoke('forgot-pin', {
-        body: { phoneNumber: member.phone_number }
-      })
-
-      if (error) throw error
+      const data = await authService.forgotPin(member.phone_number)
 
       if (data.success) {
-        setSuccess('Reset code sent to your email. Check your inbox.')
+        setSuccess('Reset code sent to your registered email address. Check your inbox.')
         setStep('reset-pin')
         setResetCode('')
         setNewPin('')
@@ -115,7 +112,7 @@ export default function PublicProfileUpdate() {
       }
     } catch (err) {
       console.error('Error sending forgot PIN email:', err)
-      setError('Failed to send reset code. Please try again.')
+      setError(err.message || 'Failed to send reset code. Please try again.')
     } finally {
       setPinLoading(false)
     }
@@ -149,36 +146,11 @@ export default function PublicProfileUpdate() {
     setResetLoading(true)
 
     try {
-      // Verify reset code and update PIN
-      const { data, error } = await supabase
-        .from('members')
-        .select('reset_pin, reset_pin_expires_at')
-        .eq('id', member.id)
-        .single()
-
-      if (error) throw error
-
-      if (!data.reset_pin || data.reset_pin !== resetCode) {
-        setError('Invalid reset code')
-        return
-      }
-
-      if (new Date() > new Date(data.reset_pin_expires_at)) {
-        setError('Reset code has expired. Please request a new one.')
-        return
-      }
-
-      // Update the PIN and clear reset data
-      const { error: updateError } = await supabase
-        .from('members')
-        .update({
-          login_pin: newPin,
-          reset_pin: null,
-          reset_pin_expires_at: null
-        })
-        .eq('id', member.id)
-
-      if (updateError) throw updateError
+      await authService.resetPin({
+        phoneNumber: member.phone_number,
+        resetCode: resetCode.trim(),
+        newPin: newPin.trim()
+      })
 
       setSuccess('PIN reset successfully! You can now use your new PIN.')
       setMember({ ...member, login_pin: newPin })
@@ -188,7 +160,7 @@ export default function PublicProfileUpdate() {
 
     } catch (err) {
       console.error('Error resetting PIN:', err)
-      setError('Failed to reset PIN. Please try again.')
+      setError(err.message || 'Failed to reset PIN. The code may be invalid or expired.')
     } finally {
       setResetLoading(false)
     }

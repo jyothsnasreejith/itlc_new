@@ -15,10 +15,15 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'itlc_db',
   port: parseInt(process.env.DB_PORT || '3306'),
   waitForConnections: true,
-  connectionLimit: 3,
+  connectionLimit: 6,
   queueLimit: 0,
   timezone: '+05:30', // Enforce Indian Standard Time (IST) for database session
   dateStrings: true   // Return raw date strings without UTC conversions
+});
+
+// Enforce Indian Standard Time (IST) on MySQL server session level for every connection
+pool.pool.on('connection', (conn) => {
+  conn.query("SET time_zone = '+05:30'");
 });
 
 // Test connection silently
